@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>양천구립도서관 프로그램 통합 대시보드</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-wrap">
+    <header class="header">
+      <h1 class="title">양천구립도서관 프로그램 통합 대시보드</h1>
+    </header>
+
+    <main class="main">
+      <section class="chart-section animate-in">
+        <div class="chart-card glass">
+          <h2 class="section-heading">도서관별 참여 현황</h2>
+          <div class="chart-legend-group" id="chartLegendGroup" aria-hidden="true">
+            <span class="chart-legend-item chart-legend-public"><i></i> 공공도서관</span>
+            <span class="chart-legend-item chart-legend-small"><i></i> 작은도서관</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="libraryChart" aria-label="도서관별 모집·참여·노쇼 막대 그래프"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section class="cards-section">
+        <h2 class="section-heading visually-hidden">도서관별 상세 현황 카드</h2>
+
+        <div class="cards-group">
+          <div class="cards-group-header">
+            <h3 class="cards-group-title">공공도서관 (9개소)</h3>
+            <div class="summary-badge summary-badge-public" id="summaryBadgePublic" aria-hidden="true"></div>
+          </div>
+          <div class="cards-grid cards-grid-public" id="cardsGridPublic">
+            <!-- Injected by script.js -->
+          </div>
+        </div>
+
+        <div class="cards-group">
+          <div class="cards-group-header">
+            <h3 class="cards-group-title">작은도서관 (2개소)</h3>
+            <div class="summary-badge summary-badge-small" id="summaryBadgeSmall" aria-hidden="true"></div>
+          </div>
+          <div class="cards-grid cards-grid-small" id="cardsGridSmall">
+            <!-- Injected by script.js -->
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

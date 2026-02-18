@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>통계 입력 — 양천구립도서관</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="input_style.css">
+</head>
+<body>
+  <div class="page-wrap">
+    <header class="header">
+      <h1 class="title">프로그램 통계 입력</h1>
+      <p class="subtitle">도서관과 프로그램을 선택한 뒤 참여 현황을 입력하세요.</p>
+    </header>
+
+    <main class="main">
+      <form class="input-form glass" id="inputForm" novalidate>
+        <div class="form-block">
+          <label class="label" for="librarySelect">도서관</label>
+          <select id="librarySelect" class="input-select" required aria-required="true">
+            <!-- optgroups: 공공도서관 / 작은도서관 by input_script.js -->
+          </select>
+        </div>
+
+        <div class="form-block">
+          <label class="label" for="programSelect">프로그램</label>
+          <select id="programSelect" class="input-select" disabled aria-disabled="true">
+            <option value="">도서관을 먼저 선택하세요</option>
+          </select>
+          <div id="programDetail" class="program-detail" aria-live="polite"></div>
+          <p id="currentSession" class="current-session"></p>
+        </div>
+
+        <section class="form-block form-block-numbers" aria-labelledby="numbersLabel">
+          <h2 class="label" id="numbersLabel">참여 현황</h2>
+
+          <div class="number-row number-row-recruit">
+            <div class="number-field number-field-recruit" id="recruitWrap">
+              <label class="number-label" for="recruitInput">모집 인원</label>
+              <div class="recruit-input-row">
+                <input type="number" id="recruitInput" class="input-number" min="0" inputmode="numeric" placeholder="0" aria-label="모집 인원">
+                <button type="button" id="recruitEditBtn" class="btn-edit" style="display: none;">수정</button>
+              </div>
+            </div>
+            <div class="number-field">
+              <label class="number-label" for="attendInput">참여 인원</label>
+              <input type="number" id="attendInput" class="input-number" min="0" inputmode="numeric" placeholder="0" aria-label="참여 인원">
+            </div>
+            <div class="number-field">
+              <label class="number-label" for="noshowInput">노쇼</label>
+              <input type="number" id="noshowInput" class="input-number" min="0" inputmode="numeric" placeholder="0" aria-label="노쇼 인원">
+            </div>
+          </div>
+
+          <div id="reasonBlock" class="reason-block" aria-hidden="true">
+            <label class="number-label" for="reasonInput">수정 사유 <span class="required-dot">*</span></label>
+            <input type="text" id="reasonInput" class="input-text" placeholder="예: 현장 추가 모집" maxlength="100" aria-required="true">
+          </div>
+        </section>
+
+        <div class="form-block form-block-submit">
+          <button type="button" id="submitBtn" class="btn-submit">제출하기</button>
+        </div>
+      </form>
+
+      <section class="history-section glass" aria-labelledby="historyTitle">
+        <h2 class="history-title" id="historyTitle">이전 회차 운영 기록</h2>
+        <ul id="historyList" class="history-list">
+          <li class="history-empty">도서관과 프로그램을 선택하면 이전 회차 기록이 표시됩니다.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+
+  <div id="modalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalMessage" aria-hidden="true">
+    <div class="modal-box glass">
+      <div class="modal-checkmark" aria-hidden="true"></div>
+      <p id="modalMessage" class="modal-message">데이터가 저장되었습니다</p>
+      <button type="button" id="modalClose" class="btn-modal-close">확인</button>
+    </div>
+  </div>
+
+  <script src="input_script.js"></script>
+</body>
+</html>
