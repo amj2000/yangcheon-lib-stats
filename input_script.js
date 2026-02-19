@@ -80,6 +80,16 @@
     return h.length ? h[h.length - 1] : null;
   }
 
+  /** 프로그램 선택 시 모집 인원 기본값: historyLog 마지막 회차(n-1)의 모집 인원. 없으면 표시용 히스토리 마지막 값 사용 */
+  function getDefaultRecruit(libraryName, programId) {
+    var last = getLastRecord(libraryName, programId);
+    if (last != null) return last.recruit;
+    var session = getCurrentSession(libraryName, programId);
+    if (session <= 1) return '';
+    var list = getDisplayHistory(libraryName, programId);
+    return list.length ? list[list.length - 1].recruit : '';
+  }
+
   /** 1 ~ (현재회차-1) 전체 표시용. 없으면 샘플 데이터로 채움 (테스트/화면 확인용) */
   function getDisplayHistory(libraryName, programId) {
     var current = getCurrentSession(libraryName, programId);
@@ -105,6 +115,27 @@
   function participationRate(recruit, attend) {
     if (!recruit || recruit <= 0) return 0;
     return Math.round((attend / recruit) * 100);
+  }
+
+  function updateCumulativeDisplay(libraryName, programId, attendValue, noshowValue) {
+    var attendEl = document.getElementById('cumulativeAttend');
+    var noshowEl = document.getElementById('cumulativeNoshow');
+    if (!attendEl || !noshowEl) return;
+    var prevAttend = 0;
+    var prevNoshow = 0;
+    if (libraryName && programId) {
+      var list = getDisplayHistory(libraryName, programId);
+      list.forEach(function (rec) {
+        prevAttend += rec.attend;
+        prevNoshow += rec.noshow;
+      });
+    }
+    var currentAttend = parseInt(attendValue, 10);
+    var currentNoshow = parseInt(noshowValue, 10);
+    if (isNaN(currentAttend)) currentAttend = 0;
+    if (isNaN(currentNoshow)) currentNoshow = 0;
+    attendEl.textContent = '누적 참여: ' + (prevAttend + currentAttend) + '명';
+    noshowEl.textContent = '누적 노쇼: ' + (prevNoshow + currentNoshow) + '명';
   }
 
   // 예시 데이터: 일부 프로그램에 1~2회차 기록 있음
@@ -214,11 +245,34 @@
     return str ? str.replace(/-/g, '.') : '';
   }
 
+  function getTodayDisplay() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '.' + m + '.' + day;
+  }
+
+  var scheduleOverride = {};
+  function getScheduleOverride(libraryName, programId) {
+    var key = logKey(libraryName, programId);
+    return scheduleOverride[key] || null;
+  }
+  function setScheduleOverride(libraryName, programId, days, time) {
+    var key = logKey(libraryName, programId);
+    scheduleOverride[key] = { days: days, time: time };
+  }
+
+  var currentProgramInfo = { library: '', programId: '', program: null };
+
   function showProgramDetail(libraryName, programId, program) {
     var el = document.getElementById('programDetail');
     if (!el) return;
     var sessionEl = document.getElementById('currentSession');
     if (!sessionEl) return;
+    currentProgramInfo.library = libraryName || '';
+    currentProgramInfo.programId = programId || '';
+    currentProgramInfo.program = program || null;
     if (!program || !libraryName || !programId) {
       el.textContent = '';
       el.classList.remove('visible');
@@ -227,11 +281,48 @@
     }
     var startStr = formatPeriodDate(program.period.start);
     var endStr = formatPeriodDate(program.period.end);
-    el.innerHTML = '운영 기간: ' + startStr + ' ~ ' + endStr + ' | ' +
-      escapeHtml(program.days) + ' | ' + escapeHtml(program.time);
+    var override = getScheduleOverride(libraryName, programId);
+    var days = override ? override.days : program.days;
+    var time = override ? override.time : program.time;
+    el.innerHTML =
+      '<div class="program-detail-row">' +
+      '<span class="program-detail-text">운영 기간: ' + startStr + ' ~ ' + endStr + ' | ' +
+      escapeHtml(days) + ' | ' + escapeHtml(time) + '</span>' +
+      '<button type="button" class="btn-schedule-edit" id="scheduleEditBtn">수정</button>' +
+      '</div>';
     el.classList.add('visible');
     var session = getCurrentSession(libraryName, programId);
-    sessionEl.textContent = '현재 ' + session + '회차';
+    sessionEl.textContent = '현재 ' + session + '회차 | ' + getTodayDisplay();
+    bindScheduleEdit(el, libraryName, programId, program);
+  }
+
+  function bindScheduleEdit(containerEl, libraryName, programId, program) {
+    var btn = document.getElementById('scheduleEditBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var override = getScheduleOverride(libraryName, programId);
+      var days = override ? override.days : program.days;
+      var time = override ? override.time : program.time;
+      containerEl.innerHTML =
+        '<div class="program-detail-edit">' +
+        '<input type="text" id="scheduleDaysInput" class="input-schedule" value="' + escapeAttr(days) + '" placeholder="요일 (예: 월, 수)">' +
+        '<input type="text" id="scheduleTimeInput" class="input-schedule" value="' + escapeAttr(time) + '" placeholder="시간 (예: 14:00~16:00)">' +
+        '<button type="button" class="btn-schedule-apply" id="scheduleApplyBtn">적용</button>' +
+        '</div>';
+      containerEl.classList.add('visible');
+      var daysInput = document.getElementById('scheduleDaysInput');
+      var timeInput = document.getElementById('scheduleTimeInput');
+      var applyBtn = document.getElementById('scheduleApplyBtn');
+      if (daysInput) daysInput.focus();
+      if (applyBtn) {
+        applyBtn.addEventListener('click', function () {
+          var newDays = daysInput ? daysInput.value.trim() : days;
+          var newTime = timeInput ? timeInput.value.trim() : time;
+          setScheduleOverride(libraryName, programId, newDays || program.days, newTime || program.time);
+          showProgramDetail(libraryName, programId, program);
+        });
+      }
+    });
   }
 
   function applyRecruitmentUI(isFirstSession, lastRecruit, recruitInput, wrapEl, reasonBlock, reasonInput) {
@@ -311,26 +402,25 @@
     };
   }
 
-  function validate(recruitStr, attendStr, noshowStr, isFirstSession, prevRecruit, reasonStr) {
+  function validate(recruitStr, attendStr, noshowStr, currentSession, prevRecruit, reasonStr) {
     var r = parseInt(recruitStr, 10);
     var a = parseInt(attendStr, 10);
     var n = parseInt(noshowStr, 10);
 
-    if (isFirstSession) {
-      if (recruitStr === '' || isNaN(r) || r < 0) {
+    var recruitMissing = recruitStr === '' || isNaN(r) || r < 0;
+    if (recruitMissing) {
+      if (currentSession === 1) {
         return { ok: false, msg: '1회차는 모집 인원을 반드시 입력해 주세요.' };
       }
-    } else {
-      if (recruitStr === '' || isNaN(r) || r < 0) {
-        return { ok: false, msg: '모집 인원을 올바르게 입력하세요.' };
-      }
-      if (prevRecruit != null && r < prevRecruit) {
-        return {
-          ok: false,
-          msg: '모집 인원은 이전 회차(' + prevRecruit + '명)보다 줄어들 수 없습니다.',
-          revertTo: prevRecruit
-        };
-      }
+      return { ok: false, msg: '모집 인원을 반드시 입력해 주세요.' };
+    }
+
+    if (currentSession >= 2 && prevRecruit != null && r < prevRecruit) {
+      return {
+        ok: false,
+        msg: '모집 인원은 이전 회차(' + prevRecruit + '명)보다 줄어들 수 없습니다.',
+        revertTo: prevRecruit
+      };
     }
 
     if (isNaN(a) || a < 0) return { ok: false, msg: '참여 인원을 올바르게 입력하세요.' };
@@ -372,6 +462,7 @@
       showProgramDetail(null, null, null);
       applyRecruitmentUI(true, '', recruitInput, recruitWrap, reasonBlock, reasonInput);
       renderHistoryList('', '');
+      updateCumulativeDisplay('', '', '', '');
       if (!lib) {
         progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
         return;
@@ -389,15 +480,30 @@
       if (!lib || !id) {
         applyRecruitmentUI(true, '', recruitInput, recruitWrap, reasonBlock, reasonInput);
         renderHistoryList('', '');
+        updateCumulativeDisplay('', '', attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
         return;
       }
       var session = getCurrentSession(lib, id);
-      var last = getLastRecord(lib, id);
-      var isFirst = session <= 1 || !last;
-      var defaultRecruit = last ? last.recruit : '';
+      var defaultRecruit = getDefaultRecruit(lib, id);
+      var isFirst = session <= 1 && defaultRecruit === '';
       applyRecruitmentUI(!isFirst, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
       renderHistoryList(lib, id);
+      updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
     });
+
+    function attachCumulativeListeners() {
+      if (attendInput) {
+        attendInput.addEventListener('input', function () {
+          updateCumulativeDisplay(libSelect.value.trim(), progSelect.value.trim(), attendInput.value, noshowInput ? noshowInput.value : '');
+        });
+      }
+      if (noshowInput) {
+        noshowInput.addEventListener('input', function () {
+          updateCumulativeDisplay(libSelect.value.trim(), progSelect.value.trim(), attendInput ? attendInput.value : '', noshowInput.value);
+        });
+      }
+    }
+    attachCumulativeListeners();
 
     if (recruitEditBtn && recruitInput && recruitWrap && reasonBlock && reasonInput) {
       recruitEditBtn.addEventListener('click', function () {
@@ -451,9 +557,8 @@
         var last = lib && progId ? getLastRecord(lib, progId) : null;
         var prevRecruit = last ? last.recruit : null;
         var currentSession = lib && progId ? getCurrentSession(lib, progId) : 1;
-        var isFirstSession = currentSession <= 1 || !last;
 
-        var result = validate(recruitStr, attendStr, noshowStr, isFirstSession, prevRecruit, reasonStr);
+        var result = validate(recruitStr, attendStr, noshowStr, currentSession, prevRecruit, reasonStr);
         if (!result.ok) {
           alert(result.msg);
           if (result.revertTo != null && recruitInput) {

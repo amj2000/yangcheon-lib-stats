@@ -47,11 +47,13 @@
             </div>
             <div class="number-field">
               <label class="number-label" for="attendInput">참여 인원</label>
-              <input type="number" id="attendInput" class="input-number" min="0" inputmode="numeric" placeholder="0" aria-label="참여 인원">
+              <input type="number" id="attendInput" class="input-number input-number-no-spin" min="0" inputmode="numeric" placeholder="0" aria-label="참여 인원">
+              <span id="cumulativeAttend" class="cumulative-text" aria-live="polite">누적 참여: 0명</span>
             </div>
             <div class="number-field">
               <label class="number-label" for="noshowInput">노쇼</label>
-              <input type="number" id="noshowInput" class="input-number" min="0" inputmode="numeric" placeholder="0" aria-label="노쇼 인원">
+              <input type="number" id="noshowInput" class="input-number input-number-no-spin" min="0" inputmode="numeric" placeholder="0" aria-label="노쇼 인원">
+              <span id="cumulativeNoshow" class="cumulative-text" aria-live="polite">누적 노쇼: 0명</span>
             </div>
           </div>
 
