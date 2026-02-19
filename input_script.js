@@ -265,9 +265,10 @@
     var html = '';
     list.forEach(function (rec) {
       var rate = participationRate(rec.recruit, rec.attend);
+      var increaseIcon = rec.reason ? '<span class="history-increase-icon" aria-label="인원 증액">↑</span>' : '';
       html += '<li class="history-item timeline-item">' +
         '<div class="timeline-marker">' +
-        '<span class="history-session">' + rec.session + '회차</span>' +
+        '<span class="history-session">' + rec.session + '회차</span>' + increaseIcon +
         '</div>' +
         '<div class="timeline-content glass">' +
         '<span class="history-stats">모집 ' + rec.recruit + ' / 참여 ' + rec.attend + ' / 노쇼 ' + rec.noshow + '</span>' +
@@ -310,17 +311,36 @@
     };
   }
 
-  function validate(recruitStr, attendStr, noshowStr, isRecruitModified, reasonStr) {
+  function validate(recruitStr, attendStr, noshowStr, isFirstSession, prevRecruit, reasonStr) {
     var r = parseInt(recruitStr, 10);
     var a = parseInt(attendStr, 10);
     var n = parseInt(noshowStr, 10);
-    if (isNaN(r) || r < 0) return { ok: false, msg: '모집 인원을 올바르게 입력하세요.' };
+
+    if (isFirstSession) {
+      if (recruitStr === '' || isNaN(r) || r < 0) {
+        return { ok: false, msg: '1회차는 모집 인원을 반드시 입력해 주세요.' };
+      }
+    } else {
+      if (recruitStr === '' || isNaN(r) || r < 0) {
+        return { ok: false, msg: '모집 인원을 올바르게 입력하세요.' };
+      }
+      if (prevRecruit != null && r < prevRecruit) {
+        return {
+          ok: false,
+          msg: '모집 인원은 이전 회차(' + prevRecruit + '명)보다 줄어들 수 없습니다.',
+          revertTo: prevRecruit
+        };
+      }
+    }
+
     if (isNaN(a) || a < 0) return { ok: false, msg: '참여 인원을 올바르게 입력하세요.' };
     if (isNaN(n) || n < 0) return { ok: false, msg: '노쇼 인원을 올바르게 입력하세요.' };
     if (a > r) return { ok: false, msg: '참여 인원은 모집 인원을 초과할 수 없습니다.' };
     if (n > r) return { ok: false, msg: '노쇼 인원은 모집 인원을 초과할 수 없습니다.' };
-    if (isRecruitModified && (!reasonStr || !reasonStr.trim())) {
-      return { ok: false, msg: '모집 인원을 수정한 경우 수정 사유를 입력해 주세요.' };
+
+    var isRecruitIncreased = prevRecruit != null && r > prevRecruit;
+    if (isRecruitIncreased && (!reasonStr || !reasonStr.trim())) {
+      return { ok: false, msg: '인원 증액 시 증액 사유를 입력해 주세요.' };
     }
     return { ok: true, recruit: r, attend: a, noshow: n };
   }
@@ -384,14 +404,38 @@
         recruitWrap.classList.remove('recruit-readonly');
         recruitInput.readOnly = false;
         recruitEditBtn.style.display = 'none';
+        recruitInput.classList.remove('recruit-success');
         recruitInput.focus();
       });
       recruitInput.addEventListener('input', function () {
         var last = getLastRecord(libSelect.value.trim(), progSelect.value.trim());
-        var prevVal = last ? last.recruit : '';
-        var changed = recruitInput.value.trim() !== String(prevVal);
-        if (changed) reasonBlock.classList.add('visible');
-        else reasonBlock.classList.remove('visible');
+        var prevVal = last ? last.recruit : null;
+        var num = parseInt(recruitInput.value.trim(), 10);
+        var isIncreased = prevVal != null && !isNaN(num) && num > prevVal;
+        if (isIncreased) {
+          reasonBlock.classList.add('visible');
+          recruitInput.classList.add('recruit-success');
+        } else {
+          reasonBlock.classList.remove('visible');
+          recruitInput.classList.remove('recruit-success');
+        }
+      });
+      recruitInput.addEventListener('blur', function () {
+        var lib = libSelect.value.trim();
+        var progId = progSelect.value.trim();
+        if (!lib || !progId) return;
+        var last = getLastRecord(lib, progId);
+        var prevRecruit = last ? last.recruit : null;
+        if (prevRecruit == null) return;
+        var r = parseInt(recruitInput.value.trim(), 10);
+        if (isNaN(r)) return;
+        if (r < prevRecruit) {
+          alert('모집 인원은 이전 회차(' + prevRecruit + '명)보다 줄어들 수 없습니다.');
+          recruitInput.value = prevRecruit;
+          recruitInput.classList.remove('recruit-success');
+          reasonBlock.classList.remove('visible');
+          reasonInput.value = '';
+        }
       });
     }
 
@@ -406,15 +450,21 @@
         var reasonStr = reasonInput ? reasonInput.value.trim() : '';
         var last = lib && progId ? getLastRecord(lib, progId) : null;
         var prevRecruit = last ? last.recruit : null;
-        var isRecruitModified = recruitStr !== '' && prevRecruit !== null && parseInt(recruitStr, 10) !== prevRecruit;
+        var currentSession = lib && progId ? getCurrentSession(lib, progId) : 1;
+        var isFirstSession = currentSession <= 1 || !last;
 
-        var result = validate(recruitStr, attendStr, noshowStr, isRecruitModified, reasonStr);
+        var result = validate(recruitStr, attendStr, noshowStr, isFirstSession, prevRecruit, reasonStr);
         if (!result.ok) {
           alert(result.msg);
+          if (result.revertTo != null && recruitInput) {
+            recruitInput.value = result.revertTo;
+            recruitInput.classList.remove('recruit-success');
+          }
           return;
         }
 
-        var payload = buildSubmitPayload(lib, progId, program, result.recruit, result.attend, result.noshow, isRecruitModified ? reasonStr : null);
+        var isRecruitIncreased = prevRecruit != null && result.recruit > prevRecruit;
+        var payload = buildSubmitPayload(lib, progId, program, result.recruit, result.attend, result.noshow, isRecruitIncreased ? reasonStr : null);
         console.log('Submit payload (for Sheets):', payload);
 
         var key = logKey(lib, progId);
@@ -425,12 +475,13 @@
           recruit: result.recruit,
           attend: result.attend,
           noshow: result.noshow,
-          reason: isRecruitModified ? reasonStr : undefined
+          reason: isRecruitIncreased ? reasonStr : undefined
         });
 
         showModal();
         renderHistoryList(lib, progId);
         if (reasonBlock) { reasonBlock.classList.remove('visible'); reasonInput.value = ''; }
+        if (recruitInput) recruitInput.classList.remove('recruit-success');
       });
     }
 

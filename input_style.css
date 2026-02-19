@@ -180,6 +180,11 @@ body {
   cursor: default;
 }
 
+.input-number.recruit-success {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .btn-edit {
   flex-shrink: 0;
   align-self: center;
@@ -462,6 +467,7 @@ body {
   width: 4rem;
   display: flex;
   align-items: center;
+  gap: 0.25rem;
   padding-right: 0.75rem;
 }
 
@@ -470,6 +476,13 @@ body {
   font-weight: 600;
   color: var(--accent);
   white-space: nowrap;
+}
+
+.history-increase-icon {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
 }
 
 .timeline-content {
