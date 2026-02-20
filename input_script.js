@@ -10,7 +10,7 @@
   var TYPE_SMALL = 'small';
 
   /** Google Apps Script Web App URL — 제출 데이터 전송용 */
-  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyG-OJBTGd7-C25m18UiohUls9P3LwXHepgcoFk1HfV6qRvQkohbYrf84sy91nScp4a1g/exec';
+  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwTDaThDRdfWmD-8jVP1FJ3oP5IPNofpkAxiYNW5IRYheLvirgBWwcpQh1RbNpx4m84lg/exec';
 
   // ——— 11개 도서관별 연간 프로그램 마스터 (테스트용: days는 1개 요일로 단순화, 다중 요일 로직은 유지)
   var programMasterData = [
