@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="input_style.css">
 </head>
 <body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div class="page-wrap">
     <header class="header">
       <h1 class="title">프로그램 통계 입력</h1>
@@ -31,7 +32,15 @@
             <option value="">도서관을 먼저 선택하세요</option>
           </select>
           <div id="programDetail" class="program-detail" aria-live="polite"></div>
-          <p id="currentSession" class="current-session"></p>
+          <div id="currentSession" class="current-session"></div>
+        </div>
+
+        <div id="totalSessionsBlock" class="total-sessions-block glass" aria-live="polite" style="display: none;">
+          <p id="totalSessionsSummary" class="total-sessions-summary"></p>
+          <div id="totalSessionsInputWrap" class="total-sessions-input-wrap" style="display: none;">
+            <label class="label" for="totalSessionsInput">총 운영 회수 (1회차에만 입력·이후 수정 불가)</label>
+            <input type="number" id="totalSessionsInput" class="input-number" min="1" inputmode="numeric" placeholder="예: 12" aria-label="총 운영 회수">
+          </div>
         </div>
 
         <section class="form-block form-block-numbers" aria-labelledby="numbersLabel">
@@ -64,7 +73,10 @@
         </section>
 
         <div class="form-block form-block-submit">
-          <button type="button" id="submitBtn" class="btn-submit">제출하기</button>
+          <div class="submit-row">
+            <button type="button" id="submitBtn" class="btn-submit">제출하기</button>
+            <p id="finalSessionNotice" class="final-session-notice" aria-live="polite" style="display: none;">최종 회차 보고입니다</p>
+          </div>
         </div>
       </form>
 
@@ -74,6 +86,11 @@
           <li class="history-empty">도서관과 프로그램을 선택하면 이전 회차 기록이 표시됩니다.</li>
         </ul>
       </section>
+
+      <div id="completionPanel" class="completion-panel glass" aria-live="polite" style="display: none;">
+        <p class="completion-message">전체 운영 보고가 완료되었습니다</p>
+        <a href="index.html" id="dashboardLink" class="btn-dashboard">대시보드로 돌아가기</a>
+      </div>
     </main>
   </div>
 

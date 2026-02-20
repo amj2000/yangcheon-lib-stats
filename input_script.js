@@ -69,6 +69,8 @@
 
   // ——— 누적 기록: 키 = "도서관명|programId", 값 = [{ session, recruit, attend, noshow, reason? }, ...]
   var historyLog = {};
+  /** 1회차 제출 시 확정된 '총 운영 회수' (키 = logKey, 값 = 숫자). 이후 회차에서 수정 불가 */
+  var totalSessionsByProgram = {};
   function logKey(library, programId) { return library + '|' + programId; }
   function getHistory(library, programId) {
     var key = logKey(library, programId);
@@ -90,15 +92,15 @@
     return list.length ? list[list.length - 1].recruit : '';
   }
 
-  /** 1 ~ (현재회차-1) 전체 표시용. 없으면 샘플 데이터로 채움 (테스트/화면 확인용) */
+  /** 1 ~ (표시회차-1) 전체 표시용. 없으면 샘플 데이터로 채움 (테스트/화면 확인용) */
   function getDisplayHistory(libraryName, programId) {
-    var current = getCurrentSession(libraryName, programId);
-    if (current <= 1) return [];
+    var nextSession = getDisplaySessionNumber(libraryName, programId);
+    if (nextSession <= 1) return [];
     var saved = getHistory(libraryName, programId);
     var bySession = {};
     saved.forEach(function (rec) { bySession[rec.session] = rec; });
     var list = [];
-    for (var s = 1; s < current; s++) {
+    for (var s = 1; s < nextSession; s++) {
       if (bySession[s]) {
         list.push(bySession[s]);
       } else {
@@ -138,18 +140,12 @@
     noshowEl.textContent = '누적 노쇼: ' + (prevNoshow + currentNoshow) + '명';
   }
 
-  // 예시 데이터: 일부 프로그램에 1~2회차 기록 있음
-  (function seedHistory() {
-    var key1 = logKey('양천중앙도서관', 'yc01');
-    historyLog[key1] = [
-      { session: 1, recruit: 20, attend: 18, noshow: 2 }
-    ];
-    var key2 = logKey('갈산도서관', 'gs02');
-    historyLog[key2] = [
-      { session: 1, recruit: 15, attend: 14, noshow: 1 },
-      { session: 2, recruit: 15, attend: 15, noshow: 0 }
-    ];
-  })();
+  // 테스트용: 시드 데이터 비움 → 모든 프로그램이 1회차부터 입력 가능
+  // (필요 시 아래처럼 채워서 2회차·3회차부터 테스트 가능)
+  // (function seedHistory() {
+  //   var key1 = logKey('양천중앙도서관', 'yc01');
+  //   historyLog[key1] = [ { session: 1, recruit: 20, attend: 18, noshow: 2 } ];
+  // })();
 
   function getTodayStr() {
     var d = new Date();
@@ -164,13 +160,89 @@
     return new Date(parts[0], parts[1] - 1, parts[2]);
   }
 
+  function dateToStr(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  }
+
   function daysBetween(startStr, endStr) {
     var start = parseDate(startStr);
     var end = parseDate(endStr);
     return Math.floor((end - start) / (24 * 60 * 60 * 1000));
   }
 
-  /** 오늘 기준 현재 회차 (1회차 = 첫 주) */
+  var DAY_NAMES_KR = ['일', '월', '화', '수', '목', '금', '토'];
+
+  /** program.days(예: "화, 목") → 해당 요일의 getDay() 배열 [2, 4] */
+  function parseDaysToWeekdays(daysStr) {
+    if (!daysStr || !daysStr.trim()) return [0, 1, 2, 3, 4, 5, 6];
+    var tokens = daysStr.split(/[,，\s]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var out = [];
+    for (var i = 0; i < tokens.length; i++) {
+      var idx = DAY_NAMES_KR.indexOf(tokens[i]);
+      if (idx !== -1) out.push(idx);
+    }
+    return out.length ? out : [1, 2, 3, 4, 5, 6];
+  }
+
+  /** 운영 기간 내 요일(days)에 해당하는 이론적 전체 운영 일수 */
+  function countSessionDaysInPeriod(program) {
+    if (!program || !program.period) return 0;
+    var weekdays = parseDaysToWeekdays(program.days);
+    var start = parseDate(program.period.start);
+    var end = program.period.end ? parseDate(program.period.end) : start;
+    var d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    var count = 0;
+    var maxDays = 366 * 2;
+    var safety = 0;
+    while (d <= end && safety < maxDays) {
+      safety++;
+      if (weekdays.indexOf(d.getDay()) !== -1) count++;
+      d.setDate(d.getDate() + 1);
+    }
+    return count;
+  }
+
+  function getTotalSessions(libraryName, programId) {
+    var key = logKey(libraryName, programId);
+    var n = totalSessionsByProgram[key];
+    return n != null && n >= 1 ? n : null;
+  }
+
+  /** 시작일부터 요일(days)만 카운트한 N회차의 정확한 운영 날짜 (YYYY-MM-DD) */
+  function getSessionDateBySchedule(program, sessionNum) {
+    if (!program || sessionNum < 1) return getTodayStr();
+    var weekdays = parseDaysToWeekdays(program.days);
+    var start = parseDate(program.period.start);
+    var end = program.period.end ? parseDate(program.period.end) : null;
+    var d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    var count = 0;
+    var maxDays = 366 * 2;
+    var safety = 0;
+    while (count < sessionNum && safety < maxDays) {
+      safety++;
+      if (weekdays.indexOf(d.getDay()) !== -1) {
+        count++;
+        if (count === sessionNum) return dateToStr(d);
+      }
+      d.setDate(d.getDate() + 1);
+      if (end && d > end) break;
+    }
+    return dateToStr(start);
+  }
+
+  /** 화면에 표시할 회차 = 다음에 입력할 회차 (히스토리 마지막+1, 없으면 1회차) */
+  function getDisplaySessionNumber(libraryName, programId) {
+    var h = getHistory(libraryName, programId);
+    if (h.length === 0) return 1;
+    var maxSession = 0;
+    h.forEach(function (rec) { if (rec.session > maxSession) maxSession = rec.session; });
+    return maxSession + 1;
+  }
+
+  /** 오늘 기준 현재 회차 (1회차 = 첫 주, 주 단위) */
   function getCurrentSession(libraryName, programId) {
     var row = programMasterData.find(function (r) { return r.library === libraryName; });
     if (!row) return 1;
@@ -253,14 +325,34 @@
     return y + '.' + m + '.' + day;
   }
 
-  var scheduleOverride = {};
-  function getScheduleOverride(libraryName, programId) {
+  var sessionDateOverride = {};
+  function getSessionDate(libraryName, programId) {
     var key = logKey(libraryName, programId);
-    return scheduleOverride[key] || null;
+    if (sessionDateOverride[key]) return sessionDateOverride[key];
+    var program = getProgramById(libraryName, programId);
+    var sessionNum = getDisplaySessionNumber(libraryName, programId);
+    return program ? getSessionDateBySchedule(program, sessionNum) : getTodayStr();
   }
-  function setScheduleOverride(libraryName, programId, days, time) {
+  function setSessionDateOverride(libraryName, programId, dateStr) {
     var key = logKey(libraryName, programId);
-    scheduleOverride[key] = { days: days, time: time };
+    if (dateStr) sessionDateOverride[key] = dateStr;
+    else delete sessionDateOverride[key];
+  }
+  function clearSessionDateOverride(libraryName, programId) {
+    setSessionDateOverride(libraryName, programId, null);
+  }
+  function getDayOfWeekKr(dateStr) {
+    if (!dateStr) return '';
+    var parts = dateStr.split('-').map(Number);
+    var d = new Date(parts[0], parts[1] - 1, parts[2]);
+    var dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    return dayNames[d.getDay()];
+  }
+  function getSessionDateDisplay(libraryName, programId) {
+    var dateStr = getSessionDate(libraryName, programId);
+    var display = dateStr ? formatPeriodDate(dateStr) : getTodayDisplay();
+    var 요일 = getDayOfWeekKr(dateStr || getTodayStr());
+    return display + (요일 ? ' (' + 요일 + ')' : '');
   }
 
   var currentProgramInfo = { library: '', programId: '', program: null };
@@ -281,45 +373,117 @@
     }
     var startStr = formatPeriodDate(program.period.start);
     var endStr = formatPeriodDate(program.period.end);
-    var override = getScheduleOverride(libraryName, programId);
-    var days = override ? override.days : program.days;
-    var time = override ? override.time : program.time;
     el.innerHTML =
       '<div class="program-detail-row">' +
       '<span class="program-detail-text">운영 기간: ' + startStr + ' ~ ' + endStr + ' | ' +
-      escapeHtml(days) + ' | ' + escapeHtml(time) + '</span>' +
-      '<button type="button" class="btn-schedule-edit" id="scheduleEditBtn">수정</button>' +
+      escapeHtml(program.days) + ' | ' + escapeHtml(program.time) + '</span>' +
       '</div>';
     el.classList.add('visible');
-    var session = getCurrentSession(libraryName, programId);
-    sessionEl.textContent = '현재 ' + session + '회차 | ' + getTodayDisplay();
-    bindScheduleEdit(el, libraryName, programId, program);
+    updateSessionDateRow(libraryName, programId);
+    updateTotalSessionsBlock(libraryName, programId);
   }
 
-  function bindScheduleEdit(containerEl, libraryName, programId, program) {
-    var btn = document.getElementById('scheduleEditBtn');
+  function updateSessionDateRow(libraryName, programId) {
+    var sessionEl = document.getElementById('currentSession');
+    if (!sessionEl) return;
+    var session = getDisplaySessionNumber(libraryName, programId);
+    var dateDisplay = getSessionDateDisplay(libraryName, programId);
+    sessionEl.innerHTML =
+      '<div class="current-session-row">' +
+      '<span class="current-session-text">현재 ' + session + '회차 | ' + dateDisplay + '</span>' +
+      '<button type="button" class="btn-session-date-edit" id="sessionDateEditBtn">수정</button>' +
+      '</div>';
+    bindSessionDateEdit(libraryName, programId);
+  }
+
+  /** 총 운영회수 블록: 1회차일 때만 입력 필드 표시, 이후 회차는 문구만 표시(고정) */
+  function updateTotalSessionsBlock(libraryName, programId) {
+    var block = document.getElementById('totalSessionsBlock');
+    var summaryEl = document.getElementById('totalSessionsSummary');
+    var inputWrap = document.getElementById('totalSessionsInputWrap');
+    var totalInput = document.getElementById('totalSessionsInput');
+    var finalNotice = document.getElementById('finalSessionNotice');
+    var completionPanel = document.getElementById('completionPanel');
+    if (!block || !summaryEl) return;
+
+    if (!libraryName || !programId) {
+      block.style.display = 'none';
+      if (inputWrap) inputWrap.style.display = 'none';
+      if (finalNotice) finalNotice.style.display = 'none';
+      if (completionPanel) completionPanel.style.display = 'none';
+      return;
+    }
+
+    var program = getProgramById(libraryName, programId);
+    var displaySession = getDisplaySessionNumber(libraryName, programId);
+    var total = getTotalSessions(libraryName, programId);
+    var theoreticalMax = program ? countSessionDaysInPeriod(program) : 0;
+    if (displaySession > 1 && total == null) {
+      block.style.display = 'none';
+      if (finalNotice) finalNotice.style.display = 'none';
+      return;
+    }
+    block.style.display = 'block';
+
+    if (displaySession === 1 && total == null) {
+      if (inputWrap) inputWrap.style.display = 'block';
+      if (totalInput) {
+        if (totalInput.value.trim() === '') totalInput.value = '';
+        totalInput.removeAttribute('readonly');
+      }
+      var typed = totalInput && totalInput.value.trim() !== '' ? parseInt(totalInput.value.trim(), 10) : NaN;
+      if (!isNaN(typed) && typed >= 1) {
+        var rest1 = theoreticalMax - typed;
+        if (rest1 < 0) rest1 = 0;
+        summaryEl.textContent = '총 운영회수: ' + typed + '회 (기간 중 ' + rest1 + '회 쉼)';
+      } else {
+        summaryEl.textContent = '총 운영 회수를 아래에 입력하세요. (기간 중 이론적 운영일: ' + theoreticalMax + '일)';
+      }
+    } else {
+      if (inputWrap) inputWrap.style.display = 'none';
+      var userTotal = total;
+      if (userTotal != null && userTotal >= 1) {
+        var rest = theoreticalMax - userTotal;
+        if (rest < 0) rest = 0;
+        summaryEl.textContent = '총 운영회수: ' + userTotal + '회 (기간 중 ' + rest + '회 쉼)';
+      } else {
+        summaryEl.textContent = '총 운영 회수를 입력하세요.';
+      }
+    }
+
+    if (finalNotice) {
+      var effectiveTotal = total != null ? total : (displaySession === 1 && totalInput && totalInput.value.trim() !== '' ? parseInt(totalInput.value.trim(), 10) : null);
+      if (effectiveTotal != null && displaySession === effectiveTotal) {
+        finalNotice.style.display = 'block';
+      } else {
+        finalNotice.style.display = 'none';
+      }
+    }
+    if (completionPanel) completionPanel.style.display = 'none';
+  }
+
+  function bindSessionDateEdit(libraryName, programId) {
+    var btn = document.getElementById('sessionDateEditBtn');
     if (!btn) return;
     btn.addEventListener('click', function () {
-      var override = getScheduleOverride(libraryName, programId);
-      var days = override ? override.days : program.days;
-      var time = override ? override.time : program.time;
-      containerEl.innerHTML =
-        '<div class="program-detail-edit">' +
-        '<input type="text" id="scheduleDaysInput" class="input-schedule" value="' + escapeAttr(days) + '" placeholder="요일 (예: 월, 수)">' +
-        '<input type="text" id="scheduleTimeInput" class="input-schedule" value="' + escapeAttr(time) + '" placeholder="시간 (예: 14:00~16:00)">' +
-        '<button type="button" class="btn-schedule-apply" id="scheduleApplyBtn">적용</button>' +
+      var currentDate = getSessionDate(libraryName, programId);
+      var sessionEl = document.getElementById('currentSession');
+      if (!sessionEl) return;
+      sessionEl.innerHTML =
+        '<div class="current-session-edit">' +
+        '<input type="date" id="sessionDateInput" class="input-schedule" value="' + escapeAttr(currentDate) + '" aria-label="해당 회차 날짜">' +
+        '<button type="button" class="btn-schedule-apply" id="sessionDateApplyBtn">적용</button>' +
         '</div>';
-      containerEl.classList.add('visible');
-      var daysInput = document.getElementById('scheduleDaysInput');
-      var timeInput = document.getElementById('scheduleTimeInput');
-      var applyBtn = document.getElementById('scheduleApplyBtn');
-      if (daysInput) daysInput.focus();
+      var dateInput = document.getElementById('sessionDateInput');
+      var applyBtn = document.getElementById('sessionDateApplyBtn');
+      if (dateInput) dateInput.focus();
       if (applyBtn) {
         applyBtn.addEventListener('click', function () {
-          var newDays = daysInput ? daysInput.value.trim() : days;
-          var newTime = timeInput ? timeInput.value.trim() : time;
-          setScheduleOverride(libraryName, programId, newDays || program.days, newTime || program.time);
-          showProgramDetail(libraryName, programId, program);
+          var newDate = dateInput ? dateInput.value.trim() : currentDate;
+          if (newDate) {
+            setSessionDateOverride(libraryName, programId, newDate);
+          }
+          updateSessionDateRow(libraryName, programId);
         });
       }
     });
@@ -341,7 +505,7 @@
     }
   }
 
-  function renderHistoryList(libraryName, programId) {
+  function renderHistoryList(libraryName, programId, highlightNew) {
     var container = document.getElementById('historyList');
     if (!container) return;
     if (!libraryName || !programId) {
@@ -354,10 +518,12 @@
       return;
     }
     var html = '';
-    list.forEach(function (rec) {
+    list.forEach(function (rec, index) {
       var rate = participationRate(rec.recruit, rec.attend);
       var increaseIcon = rec.reason ? '<span class="history-increase-icon" aria-label="인원 증액">↑</span>' : '';
-      html += '<li class="history-item timeline-item">' +
+      var isNew = highlightNew && index === list.length - 1;
+      var liClass = 'history-item timeline-item' + (isNew ? ' history-item-new' : '');
+      html += '<li class="' + liClass + '">' +
         '<div class="timeline-marker">' +
         '<span class="history-session">' + rec.session + '회차</span>' + increaseIcon +
         '</div>' +
@@ -369,6 +535,17 @@
         '</li>';
     });
     container.innerHTML = html;
+  }
+
+  function showToast(message) {
+    var el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.add('visible');
+    clearTimeout(showToast._tid);
+    showToast._tid = setTimeout(function () {
+      el.classList.remove('visible');
+    }, 2500);
   }
 
   function showModal() {
@@ -386,14 +563,14 @@
     }
   }
 
-  function buildSubmitPayload(libraryName, programId, program, recruit, attend, noshow, reason) {
+  function buildSubmitPayload(libraryName, programId, program, sessionNum, recruit, attend, noshow, reason) {
     return {
       library: libraryName,
       programId: programId,
       programName: program ? program.name : '',
       days: program ? program.days : '',
       time: program ? program.time : '',
-      session: getCurrentSession(libraryName, programId),
+      session: sessionNum,
       recruit: recruit,
       attend: attend,
       noshow: noshow,
@@ -460,6 +637,7 @@
       var lib = libSelect.value.trim();
       progSelect.disabled = true;
       showProgramDetail(null, null, null);
+      updateTotalSessionsBlock('', '');
       applyRecruitmentUI(true, '', recruitInput, recruitWrap, reasonBlock, reasonInput);
       renderHistoryList('', '');
       updateCumulativeDisplay('', '', '', '');
@@ -483,9 +661,9 @@
         updateCumulativeDisplay('', '', attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
         return;
       }
-      var session = getCurrentSession(lib, id);
+      var displaySession = getDisplaySessionNumber(lib, id);
       var defaultRecruit = getDefaultRecruit(lib, id);
-      var isFirst = session <= 1 && defaultRecruit === '';
+      var isFirst = displaySession === 1 && defaultRecruit === '';
       applyRecruitmentUI(!isFirst, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
       renderHistoryList(lib, id);
       updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
@@ -504,6 +682,13 @@
       }
     }
     attachCumulativeListeners();
+
+    var totalSessionsInputEl = document.getElementById('totalSessionsInput');
+    if (totalSessionsInputEl) {
+      totalSessionsInputEl.addEventListener('input', function () {
+        updateTotalSessionsBlock(libSelect.value.trim(), progSelect.value.trim());
+      });
+    }
 
     if (recruitEditBtn && recruitInput && recruitWrap && reasonBlock && reasonInput) {
       recruitEditBtn.addEventListener('click', function () {
@@ -556,9 +741,21 @@
         var reasonStr = reasonInput ? reasonInput.value.trim() : '';
         var last = lib && progId ? getLastRecord(lib, progId) : null;
         var prevRecruit = last ? last.recruit : null;
-        var currentSession = lib && progId ? getCurrentSession(lib, progId) : 1;
+        var sessionToSubmit = lib && progId ? getDisplaySessionNumber(lib, progId) : 1;
+        var totalSessions = getTotalSessions(lib, progId);
+        var totalSessionsInputEl = document.getElementById('totalSessionsInput');
+        if (sessionToSubmit === 1 && totalSessions == null && totalSessionsInputEl) {
+          var totalStr = totalSessionsInputEl.value.trim();
+          var totalNum = parseInt(totalStr, 10);
+          if (totalStr === '' || isNaN(totalNum) || totalNum < 1) {
+            alert('1회차 제출 시 총 운영 회수를 입력해 주세요. (1 이상)');
+            return;
+          }
+          totalSessionsByProgram[logKey(lib, progId)] = totalNum;
+          totalSessions = totalNum;
+        }
 
-        var result = validate(recruitStr, attendStr, noshowStr, currentSession, prevRecruit, reasonStr);
+        var result = validate(recruitStr, attendStr, noshowStr, sessionToSubmit, prevRecruit, reasonStr);
         if (!result.ok) {
           alert(result.msg);
           if (result.revertTo != null && recruitInput) {
@@ -569,24 +766,45 @@
         }
 
         var isRecruitIncreased = prevRecruit != null && result.recruit > prevRecruit;
-        var payload = buildSubmitPayload(lib, progId, program, result.recruit, result.attend, result.noshow, isRecruitIncreased ? reasonStr : null);
+        var payload = buildSubmitPayload(lib, progId, program, sessionToSubmit, result.recruit, result.attend, result.noshow, isRecruitIncreased ? reasonStr : null);
         console.log('Submit payload (for Sheets):', payload);
 
         var key = logKey(lib, progId);
         if (!historyLog[key]) historyLog[key] = [];
-        var session = getCurrentSession(lib, progId);
         historyLog[key].push({
-          session: session,
+          session: sessionToSubmit,
           recruit: result.recruit,
           attend: result.attend,
           noshow: result.noshow,
           reason: isRecruitIncreased ? reasonStr : undefined
         });
 
-        showModal();
-        renderHistoryList(lib, progId);
+        clearSessionDateOverride(lib, progId);
+        renderHistoryList(lib, progId, true);
+        if (attendInput) attendInput.value = '0';
+        if (noshowInput) noshowInput.value = '0';
+        if (recruitInput) {
+          recruitInput.value = String(result.recruit);
+          recruitInput.classList.remove('recruit-success');
+          recruitInput.readOnly = true;
+          recruitWrap.classList.add('recruit-readonly');
+          if (recruitEditBtn) recruitEditBtn.style.display = 'inline-flex';
+        }
         if (reasonBlock) { reasonBlock.classList.remove('visible'); reasonInput.value = ''; }
-        if (recruitInput) recruitInput.classList.remove('recruit-success');
+        var isFinalSession = totalSessions != null && sessionToSubmit === totalSessions;
+        if (isFinalSession) {
+          var panel = document.getElementById('completionPanel');
+          if (panel) {
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          showToast('전체 운영 보고가 완료되었습니다.');
+        } else {
+          updateSessionDateRow(lib, progId);
+          updateCumulativeDisplay(lib, progId, '0', '0');
+          updateTotalSessionsBlock(lib, progId);
+          showToast(sessionToSubmit + '회차 보고가 완료되었습니다.');
+        }
       });
     }
 
