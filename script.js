@@ -1,34 +1,59 @@
 /**
  * 양천구립도서관 프로그램 통합 대시보드
- * 11개 도서관 운영 현황 (모집 / 참여 / 노쇼)
+ * 구글 스프레드시트 실시간 데이터 기반 (가상 데이터 없음)
  */
 
 (function () {
   'use strict';
 
+  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwTDaThDRdfWmD-8jVP1FJ3oP5IPNofpkAxiYNW5IRYheLvirgBWwcpQh1RbNpx4m84lg/exec';
+
   const TYPE_PUBLIC = 'public';
   const TYPE_SMALL = 'small';
 
-  const LIBRARIES = [
-    { id: 'yangcheon', name: '양천중앙도서관', type: TYPE_PUBLIC, recruit: 320, attend: 298, noshow: 22 },
-    { id: 'galsan', name: '갈산도서관', type: TYPE_PUBLIC, recruit: 180, attend: 172, noshow: 8 },
-    { id: 'gaeul', name: '개울건강도서관', type: TYPE_PUBLIC, recruit: 150, attend: 141, noshow: 9 },
-    { id: 'mokma', name: '목마교육도서관', type: TYPE_PUBLIC, recruit: 220, attend: 208, noshow: 12 },
-    { id: 'migam', name: '미감도서관', type: TYPE_PUBLIC, recruit: 140, attend: 135, noshow: 5 },
-    { id: 'bangadari', name: '방아다리문학도서관', type: TYPE_PUBLIC, recruit: 190, attend: 178, noshow: 12 },
-    { id: 'sinwol', name: '신월음악도서관', type: TYPE_PUBLIC, recruit: 160, attend: 152, noshow: 8 },
-    { id: 'english', name: '영어특성화도서관', type: TYPE_PUBLIC, recruit: 200, attend: 188, noshow: 12 },
-    { id: 'haemaji', name: '해맞이역사도서관', type: TYPE_PUBLIC, recruit: 170, attend: 162, noshow: 8 },
-    { id: 'saeaerum', name: '새아름작은도서관', type: TYPE_SMALL, recruit: 80, attend: 76, noshow: 4 },
-    { id: 'mosaemi', name: '모새미작은도서관', type: TYPE_SMALL, recruit: 70, attend: 67, noshow: 3 }
+  /** 도서관 표시 순서 및 타입(공공/작은). 통계는 시트에서 가져옴 */
+  var LIBRARY_META = [
+    { id: 'yangcheon', name: '양천중앙도서관', type: TYPE_PUBLIC },
+    { id: 'galsan', name: '갈산도서관', type: TYPE_PUBLIC },
+    { id: 'gaeul', name: '개울건강도서관', type: TYPE_PUBLIC },
+    { id: 'mokma', name: '목마교육도서관', type: TYPE_PUBLIC },
+    { id: 'migam', name: '미감도서관', type: TYPE_PUBLIC },
+    { id: 'bangadari', name: '방아다리문학도서관', type: TYPE_PUBLIC },
+    { id: 'sinwol', name: '신월음악도서관', type: TYPE_PUBLIC },
+    { id: 'english', name: '영어특성화도서관', type: TYPE_PUBLIC },
+    { id: 'haemaji', name: '해맞이역사도서관', type: TYPE_PUBLIC },
+    { id: 'saeaerum', name: '새아름작은도서관', type: TYPE_SMALL },
+    { id: 'mosaemi', name: '모새미작은도서관', type: TYPE_SMALL }
   ];
 
-  const labels = LIBRARIES.map(function (lib) {
-    return lib.name.length > 10 ? lib.name.replace('도서관', '') : lib.name;
-  });
-
-  var publicLibs = LIBRARIES.filter(function (l) { return l.type === TYPE_PUBLIC; });
-  var smallLibs = LIBRARIES.filter(function (l) { return l.type === TYPE_SMALL; });
+  /** API 응답을 도서관별로 합치고, META 순서/타입과 병합 */
+  function mergeDashboardData(apiList) {
+    if (!Array.isArray(apiList) || apiList.length === 0) {
+      return LIBRARY_META.map(function (meta) {
+        return { id: meta.id, name: meta.name, type: meta.type, recruit: 0, attend: 0, noshow: 0 };
+      });
+    }
+    var byName = {};
+    apiList.forEach(function (row) {
+      var name = (row.libraryName || row.name || '').trim();
+      if (!name) return;
+      if (!byName[name]) byName[name] = { recruit: 0, attend: 0, noshow: 0 };
+      byName[name].recruit += Number(row.recruit) || 0;
+      byName[name].attend += Number(row.attend) || 0;
+      byName[name].noshow += Number(row.noshow) || 0;
+    });
+    return LIBRARY_META.map(function (meta) {
+      var stats = byName[meta.name] || { recruit: 0, attend: 0, noshow: 0 };
+      return {
+        id: meta.id,
+        name: meta.name,
+        type: meta.type,
+        recruit: stats.recruit,
+        attend: stats.attend,
+        noshow: stats.noshow
+      };
+    });
+  }
 
   function sumStats(libraries) {
     var recruit = 0, attend = 0, noshow = 0;
@@ -41,7 +66,7 @@
   }
 
   function formatNum(n) {
-    return n.toLocaleString('ko-KR');
+    return Number(n).toLocaleString('ko-KR');
   }
 
   function animateValue(el, from, to, durationMs, callback) {
@@ -76,7 +101,28 @@
     });
   }
 
-  function updateSummaryBadges() {
+  function setLoading(show) {
+    var el = document.getElementById('dashboardLoading');
+    if (!el) return;
+    if (show) {
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  }
+
+  function updateSummaryCards(totals, avgRate) {
+    var totalRecruit = document.getElementById('totalRecruit');
+    var totalAttend = document.getElementById('totalAttend');
+    var totalNoshow = document.getElementById('totalNoshow');
+    var avgEl = document.getElementById('avgParticipationRate');
+    if (totalRecruit) totalRecruit.textContent = formatNum(totals.recruit);
+    if (totalAttend) totalAttend.textContent = formatNum(totals.attend);
+    if (totalNoshow) totalNoshow.textContent = formatNum(totals.noshow);
+    if (avgEl) avgEl.textContent = (avgRate != null ? Math.round(avgRate * 10) / 10 : 0) + '%';
+  }
+
+  function updateSummaryBadges(publicLibs, smallLibs) {
     var badgePublic = document.getElementById('summaryBadgePublic');
     var badgeSmall = document.getElementById('summaryBadgeSmall');
     if (!badgePublic || !badgeSmall) return;
@@ -100,18 +146,21 @@
     }, 200);
   }
 
-  function barColorsByType(option) {
+  function barColorsByType(libraries, option) {
     var colors = [];
-    for (var i = 0; i < LIBRARIES.length; i++) {
-      colors.push(LIBRARIES[i].type === TYPE_PUBLIC ? option.public : option.small);
+    for (var i = 0; i < libraries.length; i++) {
+      colors.push(libraries[i].type === TYPE_PUBLIC ? option.public : option.small);
     }
     return colors;
   }
 
-  function renderCards() {
+  function renderCards(publicLibs, smallLibs) {
     var gridPublic = document.getElementById('cardsGridPublic');
     var gridSmall = document.getElementById('cardsGridSmall');
     if (!gridPublic || !gridSmall) return;
+
+    gridPublic.innerHTML = '';
+    gridSmall.innerHTML = '';
 
     [publicLibs, smallLibs].forEach(function (list) {
       var grid = list[0].type === TYPE_PUBLIC ? gridPublic : gridSmall;
@@ -149,21 +198,41 @@
     return div.innerHTML;
   }
 
-  function initChart() {
-    var canvas = document.getElementById('libraryChart');
-    if (!canvas) return;
+  var libraryChartInstance = null;
 
-    var ctx = canvas.getContext('2d');
-    var recruitData = LIBRARIES.map(function (l) { return l.recruit; });
-    var attendData = LIBRARIES.map(function (l) { return l.attend; });
-    var noshowData = LIBRARIES.map(function (l) { return l.noshow; });
+  function initChart(libraries) {
+    var canvas = document.getElementById('libraryChart');
+    if (!canvas || !libraries.length) return;
+
+    var labels = libraries.map(function (lib) {
+      return lib.name.length > 10 ? lib.name.replace('도서관', '') : lib.name;
+    });
+    var recruitData = libraries.map(function (l) { return l.recruit; });
+    var attendData = libraries.map(function (l) { return l.attend; });
+    var noshowData = libraries.map(function (l) { return l.noshow; });
 
     var publicBg = 'rgba(37, 99, 235, 0.45)';
     var publicBorder = 'rgba(37, 99, 235, 0.85)';
     var smallBg = 'rgba(124, 58, 237, 0.45)';
     var smallBorder = 'rgba(124, 58, 237, 0.85)';
 
-    new Chart(ctx, {
+    if (libraryChartInstance) {
+      libraryChartInstance.data.labels = labels;
+      libraryChartInstance.data.datasets[0].data = recruitData;
+      libraryChartInstance.data.datasets[1].data = attendData;
+      libraryChartInstance.data.datasets[2].data = noshowData;
+      libraryChartInstance.data.datasets[0].backgroundColor = barColorsByType(libraries, { public: publicBg, small: smallBg });
+      libraryChartInstance.data.datasets[0].borderColor = barColorsByType(libraries, { public: publicBorder, small: smallBorder });
+      libraryChartInstance.data.datasets[1].backgroundColor = barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.35)', small: 'rgba(124, 58, 237, 0.35)' });
+      libraryChartInstance.data.datasets[1].borderColor = barColorsByType(libraries, { public: publicBorder, small: smallBorder });
+      libraryChartInstance.data.datasets[2].backgroundColor = barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.22)', small: 'rgba(124, 58, 237, 0.22)' });
+      libraryChartInstance.data.datasets[2].borderColor = barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.6)', small: 'rgba(124, 58, 237, 0.6)' });
+      libraryChartInstance.update('none');
+      return;
+    }
+
+    var ctx = canvas.getContext('2d');
+    libraryChartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels,
@@ -171,22 +240,22 @@
           {
             label: '모집 현황',
             data: recruitData,
-            backgroundColor: barColorsByType({ public: publicBg, small: smallBg }),
-            borderColor: barColorsByType({ public: publicBorder, small: smallBorder }),
+            backgroundColor: barColorsByType(libraries, { public: publicBg, small: smallBg }),
+            borderColor: barColorsByType(libraries, { public: publicBorder, small: smallBorder }),
             borderWidth: 1
           },
           {
             label: '참여 인원',
             data: attendData,
-            backgroundColor: barColorsByType({ public: 'rgba(37, 99, 235, 0.35)', small: 'rgba(124, 58, 237, 0.35)' }),
-            borderColor: barColorsByType({ public: publicBorder, small: smallBorder }),
+            backgroundColor: barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.35)', small: 'rgba(124, 58, 237, 0.35)' }),
+            borderColor: barColorsByType(libraries, { public: publicBorder, small: smallBorder }),
             borderWidth: 1
           },
           {
             label: '노쇼',
             data: noshowData,
-            backgroundColor: barColorsByType({ public: 'rgba(37, 99, 235, 0.22)', small: 'rgba(124, 58, 237, 0.22)' }),
-            borderColor: barColorsByType({ public: 'rgba(37, 99, 235, 0.6)', small: 'rgba(124, 58, 237, 0.6)' }),
+            backgroundColor: barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.22)', small: 'rgba(124, 58, 237, 0.22)' }),
+            borderColor: barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.6)', small: 'rgba(124, 58, 237, 0.6)' }),
             borderWidth: 1
           }
         ]
@@ -194,49 +263,65 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: {
-          duration: 1200
-        },
-        hover: {
-          animationDuration: 0
-        },
-        interaction: {
-          mode: 'index',
-          intersect: false
-        },
-        plugins: {
-          legend: {
-            display: false
-          }
-        },
+        animation: { duration: 1200 },
+        hover: { animationDuration: 0 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false } },
         scales: {
           x: {
             grid: { display: false },
-            ticks: {
-              font: { size: 10 },
-              maxRotation: 45,
-              minRotation: 35
-            }
+            ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 35 }
           },
           y: {
             beginAtZero: true,
             grid: { color: 'rgba(0, 0, 0, 0.06)' },
-            ticks: {
-              font: { size: 11 },
-              stepSize: 50
-            }
+            ticks: { font: { size: 11 }, stepSize: 50 }
           }
         }
       }
     });
   }
 
-  function init() {
-    renderCards();
-    updateSummaryBadges();
+  function renderDashboard(libraries) {
+    var publicLibs = libraries.filter(function (l) { return l.type === TYPE_PUBLIC; });
+    var smallLibs = libraries.filter(function (l) { return l.type === TYPE_SMALL; });
+
+    var totals = sumStats(libraries);
+    var avgRate = totals.recruit > 0 ? (totals.attend / totals.recruit) * 100 : 0;
+
+    updateSummaryCards(totals, avgRate);
+    updateSummaryBadges(publicLibs, smallLibs);
+    renderCards(publicLibs, smallLibs);
     if (typeof Chart !== 'undefined') {
-      initChart();
+      initChart(libraries);
     }
+  }
+
+  function fetchDashboardData() {
+    setLoading(true);
+    var url = WEB_APP_URL + '?action=getDashboardData';
+
+    fetch(url, { method: 'GET' })
+      .then(function (res) { return res.text(); })
+      .then(function (text) {
+        try { return JSON.parse(text); } catch (e) { return []; }
+      })
+      .then(function (data) {
+        var list = Array.isArray(data) ? data : (data && Array.isArray(data.records) ? data.records : (data && Array.isArray(data.data) ? data.data : []));
+        var libraries = mergeDashboardData(list);
+        renderDashboard(libraries);
+      })
+      .catch(function () {
+        var libraries = mergeDashboardData([]);
+        renderDashboard(libraries);
+      })
+      .finally(function () {
+        setLoading(false);
+      });
+  }
+
+  function init() {
+    fetchDashboardData();
   }
 
   if (document.readyState === 'loading') {

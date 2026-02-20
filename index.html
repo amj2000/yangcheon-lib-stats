@@ -11,9 +11,35 @@
 </head>
 <body>
   <div class="page-wrap">
+    <div class="dashboard-loading" id="dashboardLoading" aria-live="polite">
+      <div class="dashboard-loading-spinner"></div>
+      <span class="dashboard-loading-text">데이터를 불러오는 중...</span>
+    </div>
+
     <header class="header">
       <h1 class="title">양천구립도서관 프로그램 통합 대시보드</h1>
     </header>
+
+    <section class="summary-cards-section" id="summaryCardsSection" aria-label="전체 누적 통계">
+      <div class="summary-cards-grid">
+        <div class="summary-card glass">
+          <span class="summary-card-label">전체 누적 모집</span>
+          <span class="summary-card-value" id="totalRecruit">0</span>
+        </div>
+        <div class="summary-card glass">
+          <span class="summary-card-label">전체 누적 참여</span>
+          <span class="summary-card-value" id="totalAttend">0</span>
+        </div>
+        <div class="summary-card glass">
+          <span class="summary-card-label">전체 누적 노쇼</span>
+          <span class="summary-card-value" id="totalNoshow">0</span>
+        </div>
+        <div class="summary-card glass summary-card-rate">
+          <span class="summary-card-label">평균 참여율</span>
+          <span class="summary-card-value" id="avgParticipationRate">0%</span>
+        </div>
+      </div>
+    </section>
 
     <main class="main">
       <section class="chart-section animate-in">
