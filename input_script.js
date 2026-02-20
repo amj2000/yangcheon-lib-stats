@@ -1113,9 +1113,64 @@
           isRecruitIncreased ? reasonStr : ''
         );
 
-        var originalBtnText = submitBtn.textContent;
-        submitBtn.disabled = true;
-        submitBtn.textContent = '데이터 전송 중...';
+        var key = logKey(lib, progId);
+        if (!historyLog[key]) historyLog[key] = [];
+        var optimisticRecord = {
+          session: sessionToSubmit,
+          date: sessionDateStr,
+          recruit: result.recruit,
+          attend: result.attend,
+          noshow: result.noshow,
+          reason: isRecruitIncreased ? reasonStr : undefined
+        };
+        historyLog[key].push(optimisticRecord);
+        var programNameForCache = (apiPayload && apiPayload.programName) || (getProgramById(lib, progId) && getProgramById(lib, progId).name) || progId;
+        saveHistoryToCache(getHistoryCacheKey(lib, programNameForCache), historyLog[key]);
+        clearSessionDateOverride(lib, progId);
+        renderHistoryList(lib, progId, true);
+        if (attendInput) attendInput.value = '0';
+        if (noshowInput) noshowInput.value = '0';
+        if (recruitInput) {
+          recruitInput.value = String(result.recruit);
+          recruitInput.classList.remove('recruit-success');
+          recruitInput.readOnly = true;
+          recruitWrap.classList.add('recruit-readonly');
+          if (recruitEditBtn) {
+            recruitEditBtn.textContent = getDisplaySessionNumber(lib, progId) === 1 ? '입력' : '수정';
+            recruitEditBtn.style.display = 'inline-flex';
+          }
+        }
+        if (reasonBlock) { reasonBlock.classList.remove('visible'); reasonInput.value = ''; }
+        var isFinalSession = totalSessions != null && sessionToSubmit === totalSessions;
+        if (isFinalSession) {
+          var panel = document.getElementById('completionPanel');
+          if (panel) {
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+        updateSessionDateRow(lib, progId);
+        updateCumulativeDisplay(lib, progId, '0', '0');
+        updateTotalSessionsBlock(lib, progId);
+        showToast('데이터가 성공적으로 저장되었습니다.');
+
+        function rollbackOptimistic() {
+          historyLog[key].pop();
+          saveHistoryToCache(getHistoryCacheKey(lib, programNameForCache), historyLog[key]);
+          renderHistoryList(lib, progId);
+          updateSessionDateRow(lib, progId);
+          updateTotalSessionsBlock(lib, progId);
+          if (attendInput) attendInput.value = String(result.attend);
+          if (noshowInput) noshowInput.value = String(result.noshow);
+          if (recruitInput) {
+            recruitInput.value = String(result.recruit);
+            recruitInput.readOnly = false;
+            recruitWrap.classList.remove('recruit-readonly');
+            if (recruitEditBtn) recruitEditBtn.style.display = 'inline-flex';
+          }
+          updateCumulativeDisplay(lib, progId, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
+          showToast('오프라인 상태이거나 서버 오류로 방금 입력한 데이터가 저장되지 않았습니다. 다시 확인해 주세요.', true);
+        }
 
         fetch(WEB_APP_URL, {
           method: 'POST',
@@ -1128,57 +1183,12 @@
           })
           .then(function (data) {
             if (data && data.result === 'success') {
-              var key = logKey(lib, progId);
-              if (!historyLog[key]) historyLog[key] = [];
-              historyLog[key].push({
-                session: sessionToSubmit,
-                date: sessionDateStr,
-                recruit: result.recruit,
-                attend: result.attend,
-                noshow: result.noshow,
-                reason: isRecruitIncreased ? reasonStr : undefined
-              });
-              var programNameForCache = (apiPayload && apiPayload.programName) || (getProgramById(lib, progId) && getProgramById(lib, progId).name) || progId;
-              saveHistoryToCache(getHistoryCacheKey(lib, programNameForCache), historyLog[key]);
-              clearSessionDateOverride(lib, progId);
-              renderHistoryList(lib, progId, true);
-              if (attendInput) attendInput.value = '0';
-              if (noshowInput) noshowInput.value = '0';
-              if (recruitInput) {
-                recruitInput.value = String(result.recruit);
-                recruitInput.classList.remove('recruit-success');
-                recruitInput.readOnly = true;
-                recruitWrap.classList.add('recruit-readonly');
-                if (recruitEditBtn) {
-                  recruitEditBtn.textContent = getDisplaySessionNumber(lib, progId) === 1 ? '입력' : '수정';
-                  recruitEditBtn.style.display = 'inline-flex';
-                }
-              }
-              if (reasonBlock) { reasonBlock.classList.remove('visible'); reasonInput.value = ''; }
-              var isFinalSession = totalSessions != null && sessionToSubmit === totalSessions;
-              if (isFinalSession) {
-                var panel = document.getElementById('completionPanel');
-                if (panel) {
-                  panel.style.display = 'block';
-                  panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-                showToast('데이터가 성공적으로 저장되었습니다.');
-              } else {
-                updateSessionDateRow(lib, progId);
-                updateCumulativeDisplay(lib, progId, '0', '0');
-                updateTotalSessionsBlock(lib, progId);
-                showToast('데이터가 성공적으로 저장되었습니다.');
-              }
-            } else {
-              showToast('네트워크 오류가 발생했습니다. 다시 시도해주세요.', true);
+              return;
             }
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalBtnText;
+            rollbackOptimistic();
           })
           .catch(function () {
-            showToast('네트워크 오류가 발생했습니다. 다시 시도해주세요.', true);
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalBtnText;
+            rollbackOptimistic();
           });
       });
     }
