@@ -84,13 +84,21 @@ body {
   }
 
   .chart-tabs {
-    justify-content: flex-start;
+    justify-content: center;
+    flex-wrap: nowrap;
+    overflow-x: visible;
+    gap: 4px;
+    padding-left: 6px;
+    padding-right: 6px;
   }
 
   .chart-tab {
-    font-size: 12px;
-    padding: 6px 10px;
+    font-size: 11px;
+    padding: 5px 8px;
     white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    text-align: center;
   }
 }
 
