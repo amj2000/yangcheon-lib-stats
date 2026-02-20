@@ -6,69 +6,56 @@
 (function () {
   'use strict';
 
-  var TYPE_PUBLIC = 'public';
-  var TYPE_SMALL = 'small';
-
-  /** Google Apps Script Web App URL — 제출 데이터 전송용 */
+  /** Google Apps Script Web App URL */
   var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwTDaThDRdfWmD-8jVP1FJ3oP5IPNofpkAxiYNW5IRYheLvirgBWwcpQh1RbNpx4m84lg/exec';
 
-  // ——— 11개 도서관별 연간 프로그램 마스터 (테스트용: days는 1개 요일로 단순화, 다중 요일 로직은 유지)
-  var programMasterData = [
-    { library: '양천중앙도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'yc01', name: '겨울방학 코딩 교실', period: { start: '2026-01-06', end: '2026-02-28' }, days: '수', time: '14:00~16:00' },
-      { id: 'yc02', name: '그림책 놀이터', period: { start: '2026-02-01', end: '2026-06-30' }, days: '목', time: '10:00~11:00' },
-      { id: 'yc03', name: '성인 독서회', period: { start: '2026-01-01', end: '2026-12-31' }, days: '금', time: '19:00~21:00' },
-      { id: 'yc04', name: '영어 그림책 스토리텔링', period: { start: '2026-02-10', end: '2026-05-31' }, days: '토', time: '11:00~12:00' }
-    ]},
-    { library: '갈산도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'gs01', name: '키즈 북아트', period: { start: '2026-02-01', end: '2026-04-30' }, days: '월', time: '15:00~16:00' },
-      { id: 'gs02', name: '창의 수학 놀이', period: { start: '2026-01-15', end: '2026-06-15' }, days: '금', time: '14:00~15:00' },
-      { id: 'gs03', name: '다문화 동화 구연', period: { start: '2026-02-01', end: '2026-12-31' }, days: '토', time: '10:00~11:00' }
-    ]},
-    { library: '개울건강도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'gh01', name: '건강 독서 클럽', period: { start: '2026-01-01', end: '2026-12-31' }, days: '화', time: '14:00~15:30' },
-      { id: 'gh02', name: '어린이 인문학', period: { start: '2026-02-15', end: '2026-05-31' }, days: '목', time: '16:00~17:00' },
-      { id: 'gh03', name: '시니어 낭독회', period: { start: '2026-02-01', end: '2026-06-30' }, days: '수', time: '10:00~11:30' }
-    ]},
-    { library: '목마교육도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'mm01', name: '독서 논술 교실', period: { start: '2026-02-01', end: '2026-07-31' }, days: '수', time: '15:00~16:30' },
-      { id: 'mm02', name: '과학 그림책 실험', period: { start: '2026-01-10', end: '2026-04-30' }, days: '금', time: '14:00~15:00' },
-      { id: 'mm03', name: '부모와 함께하는 동화여행', period: { start: '2026-02-01', end: '2026-12-31' }, days: '토', time: '11:00~12:00' }
-    ]},
-    { library: '미감도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'mg01', name: '미감 북스타트', period: { start: '2026-02-01', end: '2026-05-31' }, days: '목', time: '10:30~11:30' },
-      { id: 'mg02', name: '역사 인물 읽기', period: { start: '2026-01-01', end: '2026-12-31' }, days: '수', time: '16:00~17:00' },
-      { id: 'mg03', name: '청소년 글쓰기 워크숍', period: { start: '2026-02-10', end: '2026-04-30' }, days: '토', time: '14:00~16:00' }
-    ]},
-    { library: '방아다리문학도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'bd01', name: '문학 감상 모임', period: { start: '2026-01-01', end: '2026-12-31' }, days: '목', time: '19:00~21:00' },
-      { id: 'bd02', name: '시 쓰기 교실', period: { start: '2026-02-01', end: '2026-05-31' }, days: '월', time: '14:00~16:00' },
-      { id: 'bd03', name: '동시 낭송회', period: { start: '2026-02-15', end: '2026-06-15' }, days: '토', time: '10:00~11:00' }
-    ]},
-    { library: '신월음악도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'sw01', name: '음악과 함께하는 동화', period: { start: '2026-02-01', end: '2026-06-30' }, days: '화', time: '15:00~16:00' },
-      { id: 'sw02', name: '악기 체험 교실', period: { start: '2026-01-15', end: '2026-04-30' }, days: '금', time: '14:00~15:00' },
-      { id: 'sw03', name: '클래식 감상 독서회', period: { start: '2026-01-01', end: '2026-12-31' }, days: '일', time: '15:00~16:30' }
-    ]},
-    { library: '영어특성화도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'en01', name: 'English Story Time', period: { start: '2026-02-01', end: '2026-12-31' }, days: '목', time: '11:00~12:00' },
-      { id: 'en02', name: '영어 그림책 읽기', period: { start: '2026-01-10', end: '2026-05-31' }, days: '토', time: '10:00~11:00' },
-      { id: 'en03', name: '원서 읽기 클럽', period: { start: '2026-02-15', end: '2026-06-30' }, days: '수', time: '16:00~17:30' }
-    ]},
-    { library: '해맞이역사도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'hm01', name: '역사 토론 모임', period: { start: '2026-01-01', end: '2026-12-31' }, days: '금', time: '19:00~20:30' },
-      { id: 'hm02', name: '어린이 역사 탐험', period: { start: '2026-02-01', end: '2026-05-31' }, days: '토', time: '14:00~15:00' },
-      { id: 'hm03', name: '지역사 자료 읽기', period: { start: '2026-02-10', end: '2026-06-30' }, days: '월', time: '14:00~15:30' }
-    ]},
-    { library: '새아름작은도서관', type: TYPE_SMALL, programs: [
-      { id: 'sa01', name: '동화 구연 교실', period: { start: '2026-02-01', end: '2026-04-30' }, days: '목', time: '15:00~16:00' },
-      { id: 'sa02', name: '작은도서관 독서회', period: { start: '2026-01-01', end: '2026-12-31' }, days: '수', time: '10:00~11:00' }
-    ]},
-    { library: '모새미작은도서관', type: TYPE_SMALL, programs: [
-      { id: 'ms01', name: '그림책 놀이', period: { start: '2026-02-15', end: '2026-05-31' }, days: '수', time: '10:30~11:30' },
-      { id: 'ms02', name: '가족 독서 캠프', period: { start: '2026-02-01', end: '2026-12-31' }, days: '토', time: '14:00~15:30' }
-    ]}
-  ];
+  /** 구글 시트에서 가져온 프로그램 목록 (페이지 로드 시 GET ?action=getPrograms 로 채움) */
+  var fetchedPrograms = [];
+
+  /** 시트 날짜(ISO 또는 YYYY-MM-DD) → YYYY.MM.DD 표시용 */
+  function formatSheetDate(str) {
+    if (str == null || str === '') return '';
+    var s = String(str).trim();
+    var part = s.indexOf('T') !== -1 ? s.substring(0, s.indexOf('T')) : s.substring(0, 10);
+    if (part.length >= 10) return part.replace(/-/g, '.');
+    return s;
+  }
+
+  /** 시트 한 행을 내부 프로그램 객체로 정규화 (period.start/end는 YYYY-MM-DD 유지) */
+  function normalizeProgramFromSheet(row) {
+    var lib = row.libraryName != null ? row.libraryName : (row.library != null ? row.library : '');
+    var prog = row.programName != null ? row.programName : (row.program != null ? row.program : '');
+    if (!row || !lib || !prog) return null;
+    var startRaw = row.startDate != null ? row.startDate : (row.start_date != null ? row.start_date : '');
+    var endRaw = row.endDate != null ? row.endDate : (row.end_date != null ? row.end_date : '');
+    var start = startRaw !== '' && startRaw != null ? String(startRaw).trim().substring(0, 10) : '';
+    var end = endRaw !== '' && endRaw != null ? String(endRaw).trim().substring(0, 10) : '';
+    if (start.length < 10) start = '';
+    if (end.length < 10) end = '';
+    return {
+      id: prog,
+      name: prog,
+      libraryName: lib,
+      period: { start: start || getTodayStr(), end: end || getTodayStr() },
+      days: row.days != null ? String(row.days).trim() : '',
+      time: row.time != null ? String(row.time).trim() : ''
+    };
+  }
+
+  /** 페이지 로드 시 프로그램 목록 GET (?action=getPrograms) → fetchedPrograms 저장 */
+  function fetchProgramsList() {
+    var url = WEB_APP_URL + '?action=getPrograms';
+    return fetch(url, { method: 'GET' })
+      .then(function (res) { return res.text(); })
+      .then(function (text) {
+        try { return JSON.parse(text); } catch (e) { return []; }
+      })
+      .then(function (data) {
+        var list = Array.isArray(data) ? data : (data && Array.isArray(data.records) ? data.records : (data && Array.isArray(data.data) ? data.data : []));
+        fetchedPrograms = list.map(normalizeProgramFromSheet).filter(Boolean);
+        return fetchedPrograms;
+      });
+  }
 
   // ——— 누적 기록: 키 = "도서관명|programId", 값 = [{ session, recruit, attend, noshow, reason? }, ...]
   var historyLog = {};
@@ -95,7 +82,7 @@
     return list.length ? list[list.length - 1].recruit : '';
   }
 
-  /** 1 ~ (표시회차-1) 전체 표시용. 없으면 샘플 데이터로 채움 (테스트/화면 확인용) */
+  /** 1 ~ (표시회차-1) 전체 표시용 (historyLog만 사용, 샘플 없음) */
   function getDisplayHistory(libraryName, programId) {
     var nextSession = getDisplaySessionNumber(libraryName, programId);
     if (nextSession <= 1) return [];
@@ -104,14 +91,7 @@
     saved.forEach(function (rec) { bySession[rec.session] = rec; });
     var list = [];
     for (var s = 1; s < nextSession; s++) {
-      if (bySession[s]) {
-        list.push(bySession[s]);
-      } else {
-        var base = 18 + (s % 5);
-        var attend = Math.max(0, base - (s % 3));
-        var noshow = Math.max(0, base - attend);
-        list.push({ session: s, recruit: base, attend: attend, noshow: noshow });
-      }
+      if (bySession[s]) list.push(bySession[s]);
     }
     list.sort(function (a, b) { return a.session - b.session; });
     return list;
@@ -245,12 +225,10 @@
     return maxSession + 1;
   }
 
-  /** 오늘 기준 현재 회차 (1회차 = 첫 주, 주 단위) */
+  /** 오늘 기준 현재 회차 (스프레드시트 프로그램 기간·요일 기반) */
   function getCurrentSession(libraryName, programId) {
-    var row = programMasterData.find(function (r) { return r.library === libraryName; });
-    if (!row) return 1;
-    var program = row.programs.find(function (p) { return p.id === programId; });
-    if (!program) return 1;
+    var program = getProgramById(libraryName, programId);
+    if (!program || !program.period) return 1;
     var today = getTodayStr();
     if (today < program.period.start) return 0;
     var days = daysBetween(program.period.start, today);
@@ -261,23 +239,21 @@
     return dateStr >= start && dateStr <= end;
   }
 
+  /** 해당 도서관의 프로그램 목록 (fetchedPrograms에서 필터, 정규화된 형태) */
   function getProgramsForLibrary(libraryName) {
-    var row = programMasterData.find(function (r) { return r.library === libraryName; });
-    return row ? row.programs : [];
+    return fetchedPrograms.filter(function (p) { return p.libraryName === libraryName; });
   }
 
+  /** 해당 도서관의 프로그램 목록 (날짜 필터 없이 전체 반환) */
   function getProgramsRunningToday(libraryName) {
-    var programs = getProgramsForLibrary(libraryName);
-    var today = getTodayStr();
-    return programs.filter(function (p) {
-      return isDateInRange(today, p.period.start, p.period.end);
-    });
+    return getProgramsForLibrary(libraryName);
   }
 
+  /** 도서관명 + 프로그램명(또는 id)으로 프로그램 객체 반환 */
   function getProgramById(libraryName, programId) {
-    var programs = getProgramsForLibrary(libraryName);
-    for (var i = 0; i < programs.length; i++) {
-      if (programs[i].id === programId) return programs[i];
+    for (var i = 0; i < fetchedPrograms.length; i++) {
+      if (fetchedPrograms[i].libraryName === libraryName && (fetchedPrograms[i].id === programId || fetchedPrograms[i].name === programId))
+        return fetchedPrograms[i];
     }
     return null;
   }
@@ -292,22 +268,23 @@
     return String(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  /** fetchedPrograms에서 도서관명 중복 제거 후 도서관 드롭다운 옵션 생성 */
   function buildLibraryOptions() {
-    var publicLibs = programMasterData.filter(function (r) { return r.type === TYPE_PUBLIC; });
-    var smallLibs = programMasterData.filter(function (r) { return r.type === TYPE_SMALL; });
+    var seen = {};
+    var libs = [];
+    for (var i = 0; i < fetchedPrograms.length; i++) {
+      var lib = fetchedPrograms[i].libraryName;
+      if (lib && !seen[lib]) { seen[lib] = true; libs.push(lib); }
+    }
+    libs.sort();
     var html = '<option value="">도서관을 선택하세요</option>';
-    html += '<optgroup label="공공도서관">';
-    publicLibs.forEach(function (r) {
-      html += '<option value="' + escapeAttr(r.library) + '">' + escapeHtml(r.library) + '</option>';
+    libs.forEach(function (lib) {
+      html += '<option value="' + escapeAttr(lib) + '">' + escapeHtml(lib) + '</option>';
     });
-    html += '</optgroup><optgroup label="작은도서관">';
-    smallLibs.forEach(function (r) {
-      html += '<option value="' + escapeAttr(r.library) + '">' + escapeHtml(r.library) + '</option>';
-    });
-    html += '</optgroup>';
     return html;
   }
 
+  /** 해당 도서관 프로그램 목록으로 프로그램 드롭다운 옵션 생성 */
   function buildProgramOptions(programs) {
     var opts = '<option value="">프로그램을 선택하세요</option>';
     programs.forEach(function (p) {
@@ -374,8 +351,8 @@
       sessionEl.textContent = '';
       return;
     }
-    var startStr = formatPeriodDate(program.period.start);
-    var endStr = formatPeriodDate(program.period.end);
+    var startStr = formatSheetDate(program.period.start) || formatPeriodDate(program.period.start);
+    var endStr = formatSheetDate(program.period.end) || formatPeriodDate(program.period.end);
     el.innerHTML =
       '<div class="program-detail-row">' +
       '<span class="program-detail-text">운영 기간: ' + startStr + ' ~ ' + endStr + ' | ' +
@@ -728,9 +705,9 @@
     return { session: session, date: date || undefined, recruit: recruit, attend: attend, noshow: noshow, reason: reason || undefined };
   }
 
-  /** 구글 스프레드시트에서 해당 도서관·프로그램의 과거 기록 GET 요청 */
+  /** 구글 스프레드시트에서 해당 도서관·프로그램의 과거 기록 GET 요청 (?action=getHistory) */
   function fetchHistoryFromSheet(libraryName, programName) {
-    var url = WEB_APP_URL + '?libraryName=' + encodeURIComponent(libraryName) + '&programName=' + encodeURIComponent(programName || '');
+    var url = WEB_APP_URL + '?action=getHistory&libraryName=' + encodeURIComponent(libraryName) + '&programName=' + encodeURIComponent(programName || '');
     return fetch(url, { method: 'GET' })
       .then(function (res) { return res.text(); })
       .then(function (text) {
@@ -808,10 +785,24 @@
 
     if (!libSelect || !progSelect) return;
 
-    libSelect.innerHTML = buildLibraryOptions();
-    progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
-    progSelect.disabled = true;
+    showSyncLoading();
+    fetchProgramsList()
+      .then(function () {
+        libSelect.innerHTML = buildLibraryOptions();
+        progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
+        progSelect.disabled = true;
+        hideSyncLoading();
+        attachListeners();
+      })
+      .catch(function () {
+        hideSyncLoading();
+        libSelect.innerHTML = '<option value="">목록을 불러올 수 없습니다</option>';
+        progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
+        progSelect.disabled = true;
+        attachListeners();
+      });
 
+    function attachListeners() {
     libSelect.addEventListener('change', function () {
       var lib = libSelect.value.trim();
       progSelect.disabled = true;
@@ -1064,6 +1055,8 @@
         if (e.target === editModalOverlay) closeEditHistoryModal();
       });
     }
+    }
+
   }
 
   if (document.readyState === 'loading') {
