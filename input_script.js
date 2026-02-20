@@ -517,17 +517,21 @@
 
   function renderHistoryList(libraryName, programId, highlightNew) {
     var container = document.getElementById('historyList');
+    var section = document.getElementById('historySection');
     if (!container) return;
     if (!libraryName || !programId) {
-      container.innerHTML = '<li class="history-empty">도서관과 프로그램을 선택하면 이전 회차 기록이 표시됩니다.</li>';
+      if (section) section.style.display = 'none';
+      container.innerHTML = '';
       return;
     }
     var list = getDisplayHistory(libraryName, programId);
     var program = getProgramById(libraryName, programId);
     if (!list.length) {
-      container.innerHTML = '<li class="history-empty">이전 회차 기록이 없습니다.</li>';
+      if (section) section.style.display = 'none';
+      container.innerHTML = '';
       return;
     }
+    if (section) section.style.display = '';
     var html = '';
     list.forEach(function (rec, index) {
       var rate = participationRate(rec.recruit, rec.attend);
