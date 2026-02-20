@@ -846,8 +846,21 @@
     }
 
     if (isNaN(a) || a < 0) return { ok: false, msg: '참여 인원을 올바르게 입력하세요.' };
-    if (a > r) return { ok: false, msg: '참여 인원은 모집 인원을 초과할 수 없습니다.' };
-    if (n > r) return { ok: false, msg: '노쇼 인원은 모집 인원을 초과할 수 없습니다.' };
+    if (a > r) {
+      return {
+        ok: false,
+        msg: '오류: 참여자 수는 모집 인원을 초과할 수 없습니다. 현장 접수자가 있다면 모집 인원을 먼저 수정해 주세요.',
+        highlightAttend: true
+      };
+    }
+    var absent = r - a;
+    if (n > absent) {
+      return {
+        ok: false,
+        msg: '오류: 노쇼 인원(' + n + '명)은 실제 결석 인원(' + absent + '명)보다 많을 수 없습니다.',
+        highlightNoshow: true
+      };
+    }
 
     var isRecruitIncreased = prevRecruit != null && r > prevRecruit;
     if (isRecruitIncreased && (!reasonStr || !reasonStr.trim())) {
@@ -1004,11 +1017,13 @@
     function attachCumulativeListeners() {
       if (attendInput) {
         attendInput.addEventListener('input', function () {
+          attendInput.classList.remove('input-error');
           updateCumulativeDisplay(libSelect.value.trim(), progSelect.value.trim(), attendInput.value, noshowInput ? noshowInput.value : '');
         });
       }
       if (noshowInput) {
         noshowInput.addEventListener('input', function () {
+          noshowInput.classList.remove('input-error');
           updateCumulativeDisplay(libSelect.value.trim(), progSelect.value.trim(), attendInput ? attendInput.value : '', noshowInput.value);
         });
       }
@@ -1089,13 +1104,19 @@
 
         var result = validate(recruitStr, attendStr, noshowStr, sessionToSubmit, prevRecruit, reasonStr);
         if (!result.ok) {
-          alert(result.msg);
+          if (attendInput) attendInput.classList.remove('input-error');
+          if (noshowInput) noshowInput.classList.remove('input-error');
+          if (result.highlightAttend && attendInput) attendInput.classList.add('input-error');
+          if (result.highlightNoshow && noshowInput) noshowInput.classList.add('input-error');
+          showToast(result.msg, true);
           if (result.revertTo != null && recruitInput) {
             recruitInput.value = result.revertTo;
             recruitInput.classList.remove('recruit-success');
           }
           return;
         }
+        if (attendInput) attendInput.classList.remove('input-error');
+        if (noshowInput) noshowInput.classList.remove('input-error');
 
         var isRecruitIncreased = prevRecruit != null && result.recruit > prevRecruit;
         var sessionDateStr = getSessionDate(lib, progId);
