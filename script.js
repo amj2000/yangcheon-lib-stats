@@ -348,71 +348,65 @@
   }
 
   var libraryChartInstance = null;
+  var lastRenderedLibraries = [];
 
-  function initChart(libraries) {
+  var CHART_TITLES = {
+    programCount: '도서관별 프로그램 수 현황',
+    recruit: '도서관별 모집 인원 현황',
+    attend: '도서관별 참여자 수 현황',
+    noshow: '도서관별 노쇼 현황'
+  };
+
+  function getChartTitle(metricType) {
+    return CHART_TITLES[metricType] || CHART_TITLES.attend;
+  }
+
+  /** 탭 클릭 시 단일 막대 차트 전환 + 제목 변경. metricType: 'programCount' | 'recruit' | 'attend' | 'noshow' */
+  function renderChart(metricType, libraries) {
     var canvas = document.getElementById('libraryChart');
-    if (!canvas || !libraries.length) return;
+    var titleEl = document.getElementById('chartTitle');
+    if (!canvas) return;
 
-    var labels = libraries.map(function (lib) {
-      return lib.name.length > 10 ? lib.name.replace('도서관', '') : lib.name;
+    var libs = libraries && libraries.length ? libraries : [];
+    if (titleEl) titleEl.textContent = getChartTitle(metricType);
+
+    var labels = libs.map(function (lib) {
+      return String(lib.name || '').replace(/도서관/g, '');
     });
-    var recruitData = libraries.map(function (l) { return Number(safeNum(l.recruit)); });
-    var attendData = libraries.map(function (l) { return Number(safeNum(l.attend)); });
-    var noshowData = libraries.map(function (l) { return Number(safeNum(l.noshow)); });
+    var data = libs.map(function (l) {
+      var v = l[metricType];
+      return Number(safeNum(v));
+    });
+
+    if (libraryChartInstance) {
+      libraryChartInstance.destroy();
+      libraryChartInstance = null;
+    }
+
+    if (!libs.length) return;
 
     var publicBg = 'rgba(37, 99, 235, 0.45)';
     var publicBorder = 'rgba(37, 99, 235, 0.85)';
     var smallBg = 'rgba(124, 58, 237, 0.45)';
     var smallBorder = 'rgba(124, 58, 237, 0.85)';
 
-    if (libraryChartInstance) {
-      libraryChartInstance.data.labels = labels;
-      libraryChartInstance.data.datasets[0].data = recruitData;
-      libraryChartInstance.data.datasets[1].data = attendData;
-      libraryChartInstance.data.datasets[2].data = noshowData;
-      libraryChartInstance.data.datasets[0].backgroundColor = barColorsByType(libraries, { public: publicBg, small: smallBg });
-      libraryChartInstance.data.datasets[0].borderColor = barColorsByType(libraries, { public: publicBorder, small: smallBorder });
-      libraryChartInstance.data.datasets[1].backgroundColor = barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.35)', small: 'rgba(124, 58, 237, 0.35)' });
-      libraryChartInstance.data.datasets[1].borderColor = barColorsByType(libraries, { public: publicBorder, small: smallBorder });
-      libraryChartInstance.data.datasets[2].backgroundColor = barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.22)', small: 'rgba(124, 58, 237, 0.22)' });
-      libraryChartInstance.data.datasets[2].borderColor = barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.6)', small: 'rgba(124, 58, 237, 0.6)' });
-      libraryChartInstance.update('none');
-      return;
-    }
-
     var ctx = canvas.getContext('2d');
     libraryChartInstance = new Chart(ctx, {
       type: 'bar',
       data: {
         labels: labels,
-        datasets: [
-          {
-            label: '모집 현황',
-            data: recruitData,
-            backgroundColor: barColorsByType(libraries, { public: publicBg, small: smallBg }),
-            borderColor: barColorsByType(libraries, { public: publicBorder, small: smallBorder }),
-            borderWidth: 1
-          },
-          {
-            label: '참여 인원',
-            data: attendData,
-            backgroundColor: barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.35)', small: 'rgba(124, 58, 237, 0.35)' }),
-            borderColor: barColorsByType(libraries, { public: publicBorder, small: smallBorder }),
-            borderWidth: 1
-          },
-          {
-            label: '노쇼',
-            data: noshowData,
-            backgroundColor: barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.22)', small: 'rgba(124, 58, 237, 0.22)' }),
-            borderColor: barColorsByType(libraries, { public: 'rgba(37, 99, 235, 0.6)', small: 'rgba(124, 58, 237, 0.6)' }),
-            borderWidth: 1
-          }
-        ]
+        datasets: [{
+          label: getChartTitle(metricType),
+          data: data,
+          backgroundColor: barColorsByType(libs, { public: publicBg, small: smallBg }),
+          borderColor: barColorsByType(libs, { public: publicBorder, small: smallBorder }),
+          borderWidth: 1
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 1200 },
+        animation: { duration: 600 },
         hover: { animationDuration: 0 },
         interaction: { mode: 'index', intersect: false },
         plugins: { legend: { display: false } },
@@ -424,10 +418,32 @@
           y: {
             beginAtZero: true,
             grid: { color: 'rgba(0, 0, 0, 0.06)' },
-            ticks: { font: { size: 11 }, stepSize: 50 }
+            ticks: { font: { size: 11 } }
           }
         }
       }
+    });
+  }
+
+  function setChartTabActive(metricType) {
+    var tabs = document.querySelectorAll('.chart-tab');
+    tabs.forEach(function (tab) {
+      var isActive = (tab.getAttribute('data-metric') === metricType);
+      tab.classList.toggle('chart-tab-active', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+  }
+
+  function bindChartTabs() {
+    var container = document.querySelector('.chart-tabs');
+    if (!container) return;
+    container.querySelectorAll('.chart-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var metric = btn.getAttribute('data-metric');
+        if (!metric) return;
+        setChartTabActive(metric);
+        renderChart(metric, lastRenderedLibraries);
+      });
     });
   }
 
@@ -443,9 +459,15 @@
     updateSummaryCards(totals, totalProgram);
     updateSummaryBadges(publicLibs, smallLibs);
     renderCards(publicLibs, smallLibs);
+    lastRenderedLibraries = libs;
     if (typeof Chart !== 'undefined') {
-      initChart(libs);
+      setChartTabActive('attend');
+      renderChart('attend', libs);
     }
+  }
+
+  function initChartSection() {
+    bindChartTabs();
   }
 
   function fetchDashboardData(showSpinner) {
@@ -512,6 +534,8 @@
   }
 
   function init() {
+    initChartSection();
+
     /* 기존 잘못된 0 캐시 제거 후 새 데이터만 사용 (SWR 재사용 시 아래 3줄 삭제) */
     try {
       localStorage.removeItem(CACHE_KEY_DASHBOARD);

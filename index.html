@@ -45,13 +45,19 @@
     <main class="main">
       <section class="chart-section animate-in">
         <div class="chart-card glass">
-          <h2 class="section-heading">도서관별 참여 현황</h2>
+          <h3 class="chart-title" id="chartTitle">도서관별 참여자 수 현황</h3>
+          <div class="chart-tabs" role="tablist" aria-label="차트 지표 선택">
+            <button type="button" class="chart-tab" role="tab" aria-selected="false" data-metric="programCount">프로그램 수</button>
+            <button type="button" class="chart-tab" role="tab" aria-selected="false" data-metric="recruit">모집 인원</button>
+            <button type="button" class="chart-tab chart-tab-active" role="tab" aria-selected="true" data-metric="attend">참여자 수</button>
+            <button type="button" class="chart-tab" role="tab" aria-selected="false" data-metric="noshow">노쇼</button>
+          </div>
           <div class="chart-legend-group" id="chartLegendGroup" aria-hidden="true">
             <span class="chart-legend-item chart-legend-public"><i></i> 공공도서관</span>
             <span class="chart-legend-item chart-legend-small"><i></i> 작은도서관</span>
           </div>
           <div class="chart-wrapper">
-            <canvas id="libraryChart" aria-label="도서관별 모집·참여·노쇼 막대 그래프"></canvas>
+            <canvas id="libraryChart" aria-label="도서관별 막대 그래프"></canvas>
           </div>
         </div>
       </section>
