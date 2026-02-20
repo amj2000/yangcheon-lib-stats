@@ -536,11 +536,6 @@
   function init() {
     initChartSection();
 
-    /* 기존 잘못된 0 캐시 제거 후 새 데이터만 사용 (SWR 재사용 시 아래 3줄 삭제) */
-    try {
-      localStorage.removeItem(CACHE_KEY_DASHBOARD);
-    } catch (e) { /* 무시 */ }
-
     var cached = restoreDashboardFromCache();
     if (cached && cached.libraries && cached.libraries.length) {
       forceHideLoading();
@@ -548,7 +543,11 @@
       renderDashboard(cached.libraries, cached.totalProgramCount != null ? cached.totalProgramCount : 0, totals);
       fetchDashboardData(false);
     } else {
-      fetchDashboardData(true);
+      var empty = computeDashboardFromRows([]);
+      var emptyTotals = { recruit: empty.totalRecruit, attend: empty.totalAttend, noshow: empty.totalNoshow };
+      renderDashboard(empty.libraries, empty.totalProgramCount, emptyTotals);
+      setLoading(true);
+      fetchDashboardData(false);
     }
   }
 
