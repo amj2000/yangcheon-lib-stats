@@ -431,7 +431,14 @@
         if (totalInput.value.trim() === '') totalInput.value = '';
         totalInput.removeAttribute('readonly');
       }
-      summaryEl.textContent = '총 운영회수를 입력하세요.';
+      var typed = totalInput && totalInput.value.trim() !== '' ? parseInt(totalInput.value.trim(), 10) : NaN;
+      if (!isNaN(typed) && typed >= 1) {
+        var rest1 = theoreticalMax - typed;
+        if (rest1 < 0) rest1 = 0;
+        summaryEl.textContent = '총 운영회수: ' + typed + '회 (기간 중 ' + rest1 + '회 쉼)';
+      } else {
+        summaryEl.textContent = '총 운영회수를 입력하세요.';
+      }
     } else {
       if (inputWrap) inputWrap.style.display = 'none';
       var userTotal = total;

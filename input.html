@@ -39,7 +39,7 @@
           <div class="total-sessions-inline">
             <span id="totalSessionsSummary" class="total-sessions-summary"></span>
             <div id="totalSessionsInputWrap" class="total-sessions-input-wrap" style="display: none;">
-              <input type="number" id="totalSessionsInput" class="input-number total-sessions-input" min="1" inputmode="numeric" placeholder="0" aria-label="총 운영 회수">
+              <input type="number" id="totalSessionsInput" class="input-number total-sessions-input" min="1" inputmode="numeric" pattern="[0-9]*" placeholder="0" aria-label="총 운영 회수">
             </div>
           </div>
         </div>
@@ -51,18 +51,18 @@
             <div class="number-field number-field-recruit" id="recruitWrap">
               <label class="number-label" for="recruitInput">모집(명)</label>
               <div class="recruit-input-row">
-                <input type="number" id="recruitInput" class="input-number" min="0" inputmode="numeric" placeholder="0" aria-label="모집(명)">
+                <input type="number" id="recruitInput" class="input-number" min="0" inputmode="numeric" pattern="[0-9]*" placeholder="0" aria-label="모집(명)">
                 <button type="button" id="recruitEditBtn" class="btn-edit btn-edit-compact" style="display: none;" aria-label="모집 인원 입력">수정</button>
               </div>
             </div>
             <div class="number-field">
               <label class="number-label" for="attendInput">참여(명)</label>
-              <input type="number" id="attendInput" class="input-number input-number-no-spin" min="0" inputmode="numeric" placeholder="0" aria-label="참여(명)">
+              <input type="number" id="attendInput" class="input-number" min="0" inputmode="numeric" pattern="[0-9]*" placeholder="0" aria-label="참여(명)">
               <span id="cumulativeAttend" class="cumulative-text" aria-live="polite">누적 참여: 0명</span>
             </div>
             <div class="number-field">
               <label class="number-label" for="noshowInput">노쇼(명)</label>
-              <input type="number" id="noshowInput" class="input-number input-number-no-spin" min="0" inputmode="numeric" placeholder="0" aria-label="노쇼(명)">
+              <input type="number" id="noshowInput" class="input-number" min="0" inputmode="numeric" pattern="[0-9]*" placeholder="0" aria-label="노쇼(명)">
               <span id="cumulativeNoshow" class="cumulative-text" aria-live="polite">누적 노쇼: 0명</span>
             </div>
           </div>
@@ -113,15 +113,15 @@
         </div>
         <div class="form-block">
           <label class="label" for="editHistoryRecruit">모집(명)</label>
-          <input type="number" id="editHistoryRecruit" class="input-number" min="0" inputmode="numeric" aria-label="모집(명)">
+          <input type="number" id="editHistoryRecruit" class="input-number" min="0" inputmode="numeric" pattern="[0-9]*" aria-label="모집(명)">
         </div>
         <div class="form-block">
           <label class="label" for="editHistoryAttend">참여(명)</label>
-          <input type="number" id="editHistoryAttend" class="input-number" min="0" inputmode="numeric" aria-label="참여(명)">
+          <input type="number" id="editHistoryAttend" class="input-number" min="0" inputmode="numeric" pattern="[0-9]*" aria-label="참여(명)">
         </div>
         <div class="form-block">
           <label class="label" for="editHistoryNoshow">노쇼(명)</label>
-          <input type="number" id="editHistoryNoshow" class="input-number" min="0" inputmode="numeric" aria-label="노쇼(명)">
+          <input type="number" id="editHistoryNoshow" class="input-number" min="0" inputmode="numeric" pattern="[0-9]*" aria-label="노쇼(명)">
         </div>
         <div class="edit-history-actions">
           <button type="button" id="editHistoryCancel" class="btn-edit-history-cancel">취소</button>
