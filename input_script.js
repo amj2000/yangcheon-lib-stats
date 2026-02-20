@@ -579,7 +579,7 @@
         '<span class="history-session-with-date">' + rec.session + '회차 | ' + dateDisplay + '</span>' + increaseIcon +
         '</div>' +
         '<div class="history-item-right glass">' +
-        '<span class="history-stats">모집 ' + rec.recruit + ' / 참여 ' + rec.attend + ' / 노쇼 ' + rec.noshow + '</span>' +
+        '<span class="history-stats">모집 ' + rec.recruit + '/참여 ' + rec.attend + '/노쇼 ' + rec.noshow + '</span>' +
         '<span class="history-rate">참여율 ' + rate + '%</span>' +
         (rec.reason ? '<span class="history-reason">' + escapeHtml(rec.reason) + '</span>' : '') +
         '</div>' +
