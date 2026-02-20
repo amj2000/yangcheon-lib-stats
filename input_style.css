@@ -41,6 +41,7 @@ body {
   padding: clamp(1rem, 4vw, 2rem);
   max-width: 520px;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 /* ===== Header ===== */
@@ -994,6 +995,31 @@ input[type="number"] {
   .history-item-right .history-rate {
     padding: 0.12rem 0.35rem;
     font-size: 0.7rem;
+  }
+}
+
+/* ===== 모바일 (768px): 이전 회차 줄바꿈, FAB 위치·하단 여백 ===== */
+@media (max-width: 768px) {
+  .page-wrap {
+    padding-bottom: 90px;
+  }
+
+  .history-item-right {
+    flex-wrap: wrap;
+  }
+
+  .history-item-right .history-rate {
+    width: 100%;
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  .fab {
+    bottom: 15px;
+    right: 15px;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    min-height: 44px;
   }
 }
 
