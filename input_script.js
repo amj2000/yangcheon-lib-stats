@@ -9,17 +9,17 @@
   var TYPE_PUBLIC = 'public';
   var TYPE_SMALL = 'small';
 
-  // ——— 11개 도서관별 연간 프로그램 마스터 (단일 원천)
+  // ——— 11개 도서관별 연간 프로그램 마스터 (테스트용: days는 1개 요일로 단순화, 다중 요일 로직은 유지)
   var programMasterData = [
     { library: '양천중앙도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'yc01', name: '겨울방학 코딩 교실', period: { start: '2026-01-06', end: '2026-02-28' }, days: '월, 수', time: '14:00~16:00' },
-      { id: 'yc02', name: '그림책 놀이터', period: { start: '2026-02-01', end: '2026-06-30' }, days: '화, 목', time: '10:00~11:00' },
+      { id: 'yc01', name: '겨울방학 코딩 교실', period: { start: '2026-01-06', end: '2026-02-28' }, days: '수', time: '14:00~16:00' },
+      { id: 'yc02', name: '그림책 놀이터', period: { start: '2026-02-01', end: '2026-06-30' }, days: '목', time: '10:00~11:00' },
       { id: 'yc03', name: '성인 독서회', period: { start: '2026-01-01', end: '2026-12-31' }, days: '금', time: '19:00~21:00' },
       { id: 'yc04', name: '영어 그림책 스토리텔링', period: { start: '2026-02-10', end: '2026-05-31' }, days: '토', time: '11:00~12:00' }
     ]},
     { library: '갈산도서관', type: TYPE_PUBLIC, programs: [
       { id: 'gs01', name: '키즈 북아트', period: { start: '2026-02-01', end: '2026-04-30' }, days: '월', time: '15:00~16:00' },
-      { id: 'gs02', name: '창의 수학 놀이', period: { start: '2026-01-15', end: '2026-06-15' }, days: '수, 금', time: '14:00~15:00' },
+      { id: 'gs02', name: '창의 수학 놀이', period: { start: '2026-01-15', end: '2026-06-15' }, days: '금', time: '14:00~15:00' },
       { id: 'gs03', name: '다문화 동화 구연', period: { start: '2026-02-01', end: '2026-12-31' }, days: '토', time: '10:00~11:00' }
     ]},
     { library: '개울건강도서관', type: TYPE_PUBLIC, programs: [
@@ -28,12 +28,12 @@
       { id: 'gh03', name: '시니어 낭독회', period: { start: '2026-02-01', end: '2026-06-30' }, days: '수', time: '10:00~11:30' }
     ]},
     { library: '목마교육도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'mm01', name: '독서 논술 교실', period: { start: '2026-02-01', end: '2026-07-31' }, days: '월, 수', time: '15:00~16:30' },
+      { id: 'mm01', name: '독서 논술 교실', period: { start: '2026-02-01', end: '2026-07-31' }, days: '수', time: '15:00~16:30' },
       { id: 'mm02', name: '과학 그림책 실험', period: { start: '2026-01-10', end: '2026-04-30' }, days: '금', time: '14:00~15:00' },
       { id: 'mm03', name: '부모와 함께하는 동화여행', period: { start: '2026-02-01', end: '2026-12-31' }, days: '토', time: '11:00~12:00' }
     ]},
     { library: '미감도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'mg01', name: '미감 북스타트', period: { start: '2026-02-01', end: '2026-05-31' }, days: '화, 목', time: '10:30~11:30' },
+      { id: 'mg01', name: '미감 북스타트', period: { start: '2026-02-01', end: '2026-05-31' }, days: '목', time: '10:30~11:30' },
       { id: 'mg02', name: '역사 인물 읽기', period: { start: '2026-01-01', end: '2026-12-31' }, days: '수', time: '16:00~17:00' },
       { id: 'mg03', name: '청소년 글쓰기 워크숍', period: { start: '2026-02-10', end: '2026-04-30' }, days: '토', time: '14:00~16:00' }
     ]},
@@ -44,11 +44,11 @@
     ]},
     { library: '신월음악도서관', type: TYPE_PUBLIC, programs: [
       { id: 'sw01', name: '음악과 함께하는 동화', period: { start: '2026-02-01', end: '2026-06-30' }, days: '화', time: '15:00~16:00' },
-      { id: 'sw02', name: '악기 체험 교실', period: { start: '2026-01-15', end: '2026-04-30' }, days: '수, 금', time: '14:00~15:00' },
+      { id: 'sw02', name: '악기 체험 교실', period: { start: '2026-01-15', end: '2026-04-30' }, days: '금', time: '14:00~15:00' },
       { id: 'sw03', name: '클래식 감상 독서회', period: { start: '2026-01-01', end: '2026-12-31' }, days: '일', time: '15:00~16:30' }
     ]},
     { library: '영어특성화도서관', type: TYPE_PUBLIC, programs: [
-      { id: 'en01', name: 'English Story Time', period: { start: '2026-02-01', end: '2026-12-31' }, days: '화, 목', time: '11:00~12:00' },
+      { id: 'en01', name: 'English Story Time', period: { start: '2026-02-01', end: '2026-12-31' }, days: '목', time: '11:00~12:00' },
       { id: 'en02', name: '영어 그림책 읽기', period: { start: '2026-01-10', end: '2026-05-31' }, days: '토', time: '10:00~11:00' },
       { id: 'en03', name: '원서 읽기 클럽', period: { start: '2026-02-15', end: '2026-06-30' }, days: '수', time: '16:00~17:30' }
     ]},
@@ -58,11 +58,11 @@
       { id: 'hm03', name: '지역사 자료 읽기', period: { start: '2026-02-10', end: '2026-06-30' }, days: '월', time: '14:00~15:30' }
     ]},
     { library: '새아름작은도서관', type: TYPE_SMALL, programs: [
-      { id: 'sa01', name: '동화 구연 교실', period: { start: '2026-02-01', end: '2026-04-30' }, days: '화, 목', time: '15:00~16:00' },
+      { id: 'sa01', name: '동화 구연 교실', period: { start: '2026-02-01', end: '2026-04-30' }, days: '목', time: '15:00~16:00' },
       { id: 'sa02', name: '작은도서관 독서회', period: { start: '2026-01-01', end: '2026-12-31' }, days: '수', time: '10:00~11:00' }
     ]},
     { library: '모새미작은도서관', type: TYPE_SMALL, programs: [
-      { id: 'ms01', name: '그림책 놀이', period: { start: '2026-02-15', end: '2026-05-31' }, days: '월, 수', time: '10:30~11:30' },
+      { id: 'ms01', name: '그림책 놀이', period: { start: '2026-02-15', end: '2026-05-31' }, days: '수', time: '10:30~11:30' },
       { id: 'ms02', name: '가족 독서 캠프', period: { start: '2026-02-01', end: '2026-12-31' }, days: '토', time: '14:00~15:30' }
     ]}
   ];
