@@ -767,6 +767,12 @@ input[type="number"] {
   visibility: visible;
 }
 
+.toast.toast-error {
+  background: #dc2626;
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(220, 38, 38, 0.35);
+}
+
 /* ===== 이전 회차 운영 기록 (타임라인) ===== */
 .history-section {
   margin-top: 1.5rem;

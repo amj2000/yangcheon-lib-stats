@@ -9,6 +9,9 @@
   var TYPE_PUBLIC = 'public';
   var TYPE_SMALL = 'small';
 
+  /** Google Apps Script Web App URL — 제출 데이터 전송용 */
+  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyG-OJBTGd7-C25m18UiohUls9P3LwXHepgcoFk1HfV6qRvQkohbYrf84sy91nScp4a1g/exec';
+
   // ——— 11개 도서관별 연간 프로그램 마스터 (테스트용: days는 1개 요일로 단순화, 다중 요일 로직은 유지)
   var programMasterData = [
     { library: '양천중앙도서관', type: TYPE_PUBLIC, programs: [
@@ -649,14 +652,16 @@
     showToast('해당 회차 기록이 수정되었습니다.');
   }
 
-  function showToast(message) {
+  function showToast(message, isError) {
     var el = document.getElementById('toast');
     if (!el) return;
     el.textContent = message;
+    el.classList.toggle('toast-error', !!isError);
     el.classList.add('visible');
     clearTimeout(showToast._tid);
     showToast._tid = setTimeout(function () {
       el.classList.remove('visible');
+      el.classList.remove('toast-error');
     }, 2500);
   }
 
@@ -688,6 +693,22 @@
       noshow: noshow,
       recruitChangeReason: reason || null,
       submittedAt: new Date().toISOString()
+    };
+  }
+
+  /** Google 스프레드시트 Web App 전송용 페이로드 (CORS 대응 키 구성) */
+  function buildApiPayload(libraryName, programName, totalSessions, currentSession, sessionDate, recruitmentCount, participationCount, noShowCount, participationRate, reason) {
+    return {
+      libraryName: libraryName,
+      programName: programName || '',
+      totalSessions: totalSessions != null ? totalSessions : 0,
+      currentSession: currentSession,
+      sessionDate: sessionDate || '',
+      recruitmentCount: recruitmentCount,
+      participationCount: participationCount,
+      noShowCount: noShowCount,
+      participationRate: participationRate,
+      reason: reason || ''
     };
   }
 
@@ -877,50 +898,86 @@
         }
 
         var isRecruitIncreased = prevRecruit != null && result.recruit > prevRecruit;
-        var payload = buildSubmitPayload(lib, progId, program, sessionToSubmit, result.recruit, result.attend, result.noshow, isRecruitIncreased ? reasonStr : null);
-        console.log('Submit payload (for Sheets):', payload);
-
-        var key = logKey(lib, progId);
-        if (!historyLog[key]) historyLog[key] = [];
         var sessionDateStr = getSessionDate(lib, progId);
-        historyLog[key].push({
-          session: sessionToSubmit,
-          date: sessionDateStr,
-          recruit: result.recruit,
-          attend: result.attend,
-          noshow: result.noshow,
-          reason: isRecruitIncreased ? reasonStr : undefined
-        });
+        var rate = participationRate(result.recruit, result.attend);
+        var apiPayload = buildApiPayload(
+          lib,
+          program ? program.name : '',
+          totalSessions,
+          sessionToSubmit,
+          sessionDateStr,
+          result.recruit,
+          result.attend,
+          result.noshow,
+          rate,
+          isRecruitIncreased ? reasonStr : ''
+        );
 
-        clearSessionDateOverride(lib, progId);
-        renderHistoryList(lib, progId, true);
-        if (attendInput) attendInput.value = '0';
-        if (noshowInput) noshowInput.value = '0';
-        if (recruitInput) {
-          recruitInput.value = String(result.recruit);
-          recruitInput.classList.remove('recruit-success');
-          recruitInput.readOnly = true;
-          recruitWrap.classList.add('recruit-readonly');
-          if (recruitEditBtn) {
-          recruitEditBtn.textContent = getDisplaySessionNumber(lib, progId) === 1 ? '입력' : '수정';
-          recruitEditBtn.style.display = 'inline-flex';
-        }
-        }
-        if (reasonBlock) { reasonBlock.classList.remove('visible'); reasonInput.value = ''; }
-        var isFinalSession = totalSessions != null && sessionToSubmit === totalSessions;
-        if (isFinalSession) {
-          var panel = document.getElementById('completionPanel');
-          if (panel) {
-            panel.style.display = 'block';
-            panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-          showToast('전체 운영 보고가 완료되었습니다.');
-        } else {
-          updateSessionDateRow(lib, progId);
-          updateCumulativeDisplay(lib, progId, '0', '0');
-          updateTotalSessionsBlock(lib, progId);
-          showToast(sessionToSubmit + '회차 보고가 완료되었습니다.');
-        }
+        var originalBtnText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = '데이터 전송 중...';
+
+        fetch(WEB_APP_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(apiPayload)
+        })
+          .then(function (res) { return res.text(); })
+          .then(function (text) {
+            try { return JSON.parse(text); } catch (e) { return { result: text }; }
+          })
+          .then(function (data) {
+            if (data && data.result === 'success') {
+              var key = logKey(lib, progId);
+              if (!historyLog[key]) historyLog[key] = [];
+              historyLog[key].push({
+                session: sessionToSubmit,
+                date: sessionDateStr,
+                recruit: result.recruit,
+                attend: result.attend,
+                noshow: result.noshow,
+                reason: isRecruitIncreased ? reasonStr : undefined
+              });
+              clearSessionDateOverride(lib, progId);
+              renderHistoryList(lib, progId, true);
+              if (attendInput) attendInput.value = '0';
+              if (noshowInput) noshowInput.value = '0';
+              if (recruitInput) {
+                recruitInput.value = String(result.recruit);
+                recruitInput.classList.remove('recruit-success');
+                recruitInput.readOnly = true;
+                recruitWrap.classList.add('recruit-readonly');
+                if (recruitEditBtn) {
+                  recruitEditBtn.textContent = getDisplaySessionNumber(lib, progId) === 1 ? '입력' : '수정';
+                  recruitEditBtn.style.display = 'inline-flex';
+                }
+              }
+              if (reasonBlock) { reasonBlock.classList.remove('visible'); reasonInput.value = ''; }
+              var isFinalSession = totalSessions != null && sessionToSubmit === totalSessions;
+              if (isFinalSession) {
+                var panel = document.getElementById('completionPanel');
+                if (panel) {
+                  panel.style.display = 'block';
+                  panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                showToast('데이터가 성공적으로 저장되었습니다.');
+              } else {
+                updateSessionDateRow(lib, progId);
+                updateCumulativeDisplay(lib, progId, '0', '0');
+                updateTotalSessionsBlock(lib, progId);
+                showToast('데이터가 성공적으로 저장되었습니다.');
+              }
+            } else {
+              showToast('네트워크 오류가 발생했습니다. 다시 시도해주세요.', true);
+            }
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+          })
+          .catch(function () {
+            showToast('네트워크 오류가 발생했습니다. 다시 시도해주세요.', true);
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+          });
       });
     }
 
