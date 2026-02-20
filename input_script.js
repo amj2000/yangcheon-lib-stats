@@ -9,7 +9,10 @@
   /** Google Apps Script Web App URL */
   var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwTDaThDRdfWmD-8jVP1FJ3oP5IPNofpkAxiYNW5IRYheLvirgBWwcpQh1RbNpx4m84lg/exec';
 
-  /** 구글 시트에서 가져온 프로그램 목록 (페이지 로드 시 GET ?action=getPrograms 로 채움) */
+  /** SWR 캐시 키 (프로그램 목록) */
+  var CACHE_KEY_PROGRAMS = 'cachedPrograms';
+
+  /** 구글 시트에서 가져온 프로그램 목록 (페이지 로드 시 GET ?action=getPrograms 또는 캐시로 채움) */
   var fetchedPrograms = [];
 
   /** 시트 날짜(ISO 또는 YYYY-MM-DD) → YYYY.MM.DD 표시용 */
@@ -42,7 +45,7 @@
     };
   }
 
-  /** 페이지 로드 시 프로그램 목록 GET (?action=getPrograms) → fetchedPrograms 저장 */
+  /** 프로그램 목록 GET (?action=getPrograms) → fetchedPrograms 저장. 캐시 갱신은 호출부에서 처리 */
   function fetchProgramsList() {
     var url = WEB_APP_URL + '?action=getPrograms';
     return fetch(url, { method: 'GET' })
@@ -55,6 +58,29 @@
         fetchedPrograms = list.map(normalizeProgramFromSheet).filter(Boolean);
         return fetchedPrograms;
       });
+  }
+
+  /** 캐시에서 프로그램 목록 복원. 유효하면 fetchedPrograms 설정 후 true, 아니면 false */
+  function restoreProgramsFromCache() {
+    try {
+      var raw = localStorage.getItem(CACHE_KEY_PROGRAMS);
+      if (!raw) return false;
+      var list = JSON.parse(raw);
+      if (!Array.isArray(list) || list.length === 0) return false;
+      fetchedPrograms = list;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /** 현재 fetchedPrograms를 캐시에 저장 */
+  function saveProgramsToCache() {
+    try {
+      if (fetchedPrograms.length) {
+        localStorage.setItem(CACHE_KEY_PROGRAMS, JSON.stringify(fetchedPrograms));
+      }
+    } catch (e) { /* quota 등 무시 */ }
   }
 
   // ——— 누적 기록: 키 = "도서관명|programId", 값 = [{ session, recruit, attend, noshow, reason? }, ...]
@@ -816,21 +842,55 @@
 
     if (!libSelect || !progSelect) return;
 
+    function renderDropdownsFromFetched() {
+      libSelect.innerHTML = buildLibraryOptions();
+      progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
+      progSelect.disabled = true;
+    }
+
+    function onProgramsReady() {
+      renderDropdownsFromFetched();
+      attachListeners();
+    }
+
+    function onProgramsError() {
+      libSelect.innerHTML = '<option value="">목록을 불러올 수 없습니다</option>';
+      progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
+      progSelect.disabled = true;
+      attachListeners();
+    }
+
+    if (restoreProgramsFromCache()) {
+      renderDropdownsFromFetched();
+      attachListeners();
+      fetchProgramsList()
+        .then(function () {
+          saveProgramsToCache();
+          var lib = libSelect.value.trim();
+          var prog = progSelect.value.trim();
+          libSelect.innerHTML = buildLibraryOptions();
+          if (lib) libSelect.value = lib;
+          if (lib) {
+            var programs = getProgramsRunningToday(lib);
+            progSelect.innerHTML = buildProgramOptions(programs);
+            progSelect.disabled = false;
+            if (prog) progSelect.value = prog;
+          }
+        })
+        .catch(function () { /* 백그라운드 갱신 실패 시 캐시 화면 유지 */ });
+      return;
+    }
+
     showSyncLoading();
     fetchProgramsList()
       .then(function () {
-        libSelect.innerHTML = buildLibraryOptions();
-        progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
-        progSelect.disabled = true;
+        saveProgramsToCache();
         hideSyncLoading();
-        attachListeners();
+        onProgramsReady();
       })
       .catch(function () {
         hideSyncLoading();
-        libSelect.innerHTML = '<option value="">목록을 불러올 수 없습니다</option>';
-        progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
-        progSelect.disabled = true;
-        attachListeners();
+        onProgramsError();
       });
 
     function attachListeners() {
