@@ -138,12 +138,47 @@
     return y + '-' + m + '-' + day;
   }
 
+  /** 다양한 입력(ISO 문자열, YYYY-MM-DD, Date)을 Date 객체로 안전 변환. 실패 시 오늘 반환 */
+  function toDate(value) {
+    if (value instanceof Date) return isNaN(value.getTime()) ? new Date() : value;
+    if (value == null || value === '') return new Date();
+    var s = String(value).trim();
+    if (s.length >= 10) {
+      var part = s.indexOf('T') !== -1 ? s.substring(0, 10) : s.substring(0, 10);
+      var nums = part.split('-').map(Number);
+      if (nums.length >= 3 && !isNaN(nums[0]) && !isNaN(nums[1]) && !isNaN(nums[2]))
+        return new Date(nums[0], nums[1] - 1, nums[2]);
+    }
+    var parsed = new Date(s);
+    return isNaN(parsed.getTime()) ? new Date() : parsed;
+  }
+
+  /** 날짜(문자열/Date) → "YYYY.MM.DD (요일)" 표시. ISO는 KST 기준 해석, NaN 방어 */
+  function formatDate(value) {
+    if (value == null || value === '') return getTodayDisplay() + ' (' + DAY_NAMES_KR[new Date().getDay()] + ')';
+    var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+    var s = typeof value === 'string' ? value.trim() : '';
+    if (s.indexOf('T') !== -1) {
+      var d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        var kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+        var y = kst.getUTCFullYear(), m = kst.getUTCMonth() + 1, day = kst.getUTCDate();
+        var dow = new Date(Date.UTC(y, m - 1, day)).getUTCDay();
+        return y + '.' + pad(m) + '.' + pad(day) + ' (' + DAY_NAMES_KR[dow] + ')';
+      }
+    }
+    var d = toDate(value);
+    if (isNaN(d.getTime())) return getTodayDisplay() + ' (' + DAY_NAMES_KR[new Date().getDay()] + ')';
+    var y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
+    return y + '.' + pad(m) + '.' + pad(day) + ' (' + DAY_NAMES_KR[d.getDay()] + ')';
+  }
+
   function parseDate(str) {
-    var parts = str.split('-').map(Number);
-    return new Date(parts[0], parts[1] - 1, parts[2]);
+    return toDate(str);
   }
 
   function dateToStr(d) {
+    if (!d || !(d instanceof Date) || isNaN(d.getTime())) return getTodayStr();
     var y = d.getFullYear();
     var m = String(d.getMonth() + 1).padStart(2, '0');
     var day = String(d.getDate()).padStart(2, '0');
@@ -323,16 +358,13 @@
   }
   function getDayOfWeekKr(dateStr) {
     if (!dateStr) return '';
-    var parts = dateStr.split('-').map(Number);
-    var d = new Date(parts[0], parts[1] - 1, parts[2]);
-    var dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-    return dayNames[d.getDay()];
+    var d = toDate(dateStr);
+    return isNaN(d.getTime()) ? '' : DAY_NAMES_KR[d.getDay()];
   }
+  /** 현재 회차 날짜 표시: 항상 formatDate 경유 → NaN 방지 */
   function getSessionDateDisplay(libraryName, programId) {
     var dateStr = getSessionDate(libraryName, programId);
-    var display = dateStr ? formatPeriodDate(dateStr) : getTodayDisplay();
-    var 요일 = getDayOfWeekKr(dateStr || getTodayStr());
-    return display + (요일 ? ' (' + 요일 + ')' : '');
+    return formatDate(dateStr || getTodayStr());
   }
 
   var currentProgramInfo = { library: '', programId: '', program: null };
@@ -473,9 +505,10 @@
       var currentDate = getSessionDate(libraryName, programId);
       var sessionEl = document.getElementById('currentSession');
       if (!sessionEl) return;
+      var dateForInput = dateToStr(toDate(currentDate));
       sessionEl.innerHTML =
         '<div class="current-session-edit">' +
-        '<input type="date" id="sessionDateInput" class="input-schedule" value="' + escapeAttr(currentDate) + '" aria-label="해당 회차 날짜">' +
+        '<input type="date" id="sessionDateInput" class="input-schedule" value="' + escapeAttr(dateForInput) + '" aria-label="해당 회차 날짜">' +
         '<button type="button" class="btn-schedule-apply" id="sessionDateApplyBtn">적용</button>' +
         '</div>';
       var dateInput = document.getElementById('sessionDateInput');
@@ -511,12 +544,10 @@
     }
   }
 
-  /** 해당 회차 기록의 운영 날짜 (저장된 date 또는 스케줄 기반). 예: 2026.01.10 (월) */
+  /** 해당 회차 기록의 운영 날짜 (저장된 date/sessionDate 또는 스케줄 기반). 항상 formatDate 경유 */
   function getRecordDateDisplay(rec, program) {
-    var dateStr = rec.date || (program ? getSessionDateBySchedule(program, rec.session) : getTodayStr());
-    var display = formatPeriodDate(dateStr);
-    var dayKr = getDayOfWeekKr(dateStr);
-    return display + (dayKr ? ' (' + dayKr + ')' : '');
+    var raw = rec.date || rec.sessionDate || (program ? getSessionDateBySchedule(program, rec.session) : null) || getTodayStr();
+    return formatDate(raw);
   }
 
   function renderHistoryList(libraryName, programId, highlightNew) {
@@ -579,8 +610,8 @@
     var program = getProgramById(libraryName, programId);
     var rec = list.filter(function (r) { return r.session === sessionNum; })[0];
     if (!rec || !overlay) return;
-    var dateStr = rec.date || (program ? getSessionDateBySchedule(program, rec.session) : getTodayStr());
-    document.getElementById('editHistoryDate').value = dateStr;
+    var raw = rec.date || rec.sessionDate || (program ? getSessionDateBySchedule(program, rec.session) : null) || getTodayStr();
+    document.getElementById('editHistoryDate').value = dateToStr(toDate(raw));
     document.getElementById('editHistoryRecruit').value = rec.recruit;
     document.getElementById('editHistoryAttend').value = rec.attend;
     document.getElementById('editHistoryNoshow').value = rec.noshow;
