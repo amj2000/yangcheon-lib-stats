@@ -11,6 +11,8 @@
 
   /** SWR 캐시 키 (프로그램 목록) */
   var CACHE_KEY_PROGRAMS = 'cachedPrograms';
+  /** 히스토리 캐시 키 접두사. 실제 키: historyCache_도서관명_프로그램명 */
+  var CACHE_KEY_HISTORY_PREFIX = 'historyCache_';
 
   /** 구글 시트에서 가져온 프로그램 목록 (페이지 로드 시 GET ?action=getPrograms 또는 캐시로 채움) */
   var fetchedPrograms = [];
@@ -79,6 +81,33 @@
     try {
       if (fetchedPrograms.length) {
         localStorage.setItem(CACHE_KEY_PROGRAMS, JSON.stringify(fetchedPrograms));
+      }
+    } catch (e) { /* quota 등 무시 */ }
+  }
+
+  /** 도서관·프로그램별 히스토리 캐시 키 (로컬 스토리지용) */
+  function getHistoryCacheKey(libraryName, programNameOrId) {
+    return CACHE_KEY_HISTORY_PREFIX + (libraryName || '') + '_' + (programNameOrId || '');
+  }
+
+  /** 히스토리 캐시에서 복원. 유효하면 정규화된 기록 배열 반환, 없거나 오류면 null */
+  function restoreHistoryFromCache(cacheKey) {
+    try {
+      var raw = localStorage.getItem(cacheKey);
+      if (raw == null) return null;
+      var list = JSON.parse(raw);
+      if (!Array.isArray(list)) return null;
+      return list;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** 히스토리 기록 배열을 해당 키로 캐시에 저장 */
+  function saveHistoryToCache(cacheKey, records) {
+    try {
+      if (cacheKey && Array.isArray(records)) {
+        localStorage.setItem(cacheKey, JSON.stringify(records));
       }
     } catch (e) { /* quota 등 무시 */ }
   }
@@ -678,6 +707,8 @@
     rec.recruit = recruitVal;
     rec.attend = attendVal;
     rec.noshow = noshowVal;
+    var programNameForCache = (getProgramById(libraryName, programId) && getProgramById(libraryName, programId).name) || programId;
+    saveHistoryToCache(getHistoryCacheKey(libraryName, programNameForCache), historyLog[key]);
     closeEditHistoryModal();
     renderHistoryList(libraryName, programId);
     var attendInput = document.getElementById('attendInput');
@@ -922,33 +953,51 @@
         updateCumulativeDisplay('', '', attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
         return;
       }
+      var key = logKey(lib, id);
+      var programName = program ? program.name : id;
+      var historyCacheKey = getHistoryCacheKey(lib, programName);
       var totalSessionsInputEl = document.getElementById('totalSessionsInput');
+
+      function applyHistoryUI() {
+        updateSessionDateRow(lib, id);
+        updateTotalSessionsBlock(lib, id);
+        var displaySession = getDisplaySessionNumber(lib, id);
+        var defaultRecruit = getDefaultRecruit(lib, id);
+        applyRecruitmentUI(displaySession, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
+        renderHistoryList(lib, id);
+        updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
+      }
+
+      var cached = restoreHistoryFromCache(historyCacheKey);
+      if (cached !== null) {
+        historyLog[key] = cached;
+        applyHistoryUI();
+        fetchHistoryFromSheet(lib, programName)
+          .then(function (records) {
+            var list = Array.isArray(records) ? records : [];
+            historyLog[key] = list;
+            saveHistoryToCache(historyCacheKey, list);
+            applyHistoryUI();
+          })
+          .catch(function () { /* 백그라운드 갱신 실패 시 캐시 화면 유지 */ });
+        return;
+      }
+
       showSyncLoading();
       setFormDisabled(true, recruitInput, attendInput, noshowInput, totalSessionsInputEl, submitBtn);
-      fetchHistoryFromSheet(lib, program ? program.name : '')
+      fetchHistoryFromSheet(lib, programName)
         .then(function (records) {
-          var key = logKey(lib, id);
-          historyLog[key] = Array.isArray(records) ? records : [];
+          var list = Array.isArray(records) ? records : [];
+          historyLog[key] = list;
+          saveHistoryToCache(historyCacheKey, list);
           hideSyncLoading();
           setFormDisabled(false, recruitInput, attendInput, noshowInput, totalSessionsInputEl, submitBtn);
-          updateSessionDateRow(lib, id);
-          updateTotalSessionsBlock(lib, id);
-          var displaySession = getDisplaySessionNumber(lib, id);
-          var defaultRecruit = getDefaultRecruit(lib, id);
-          applyRecruitmentUI(displaySession, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
-          renderHistoryList(lib, id);
-          updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
+          applyHistoryUI();
         })
         .catch(function () {
           hideSyncLoading();
           setFormDisabled(false, recruitInput, attendInput, noshowInput, totalSessionsInputEl, submitBtn);
-          updateSessionDateRow(lib, id);
-          updateTotalSessionsBlock(lib, id);
-          var displaySession = getDisplaySessionNumber(lib, id);
-          var defaultRecruit = getDefaultRecruit(lib, id);
-          applyRecruitmentUI(displaySession, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
-          renderHistoryList(lib, id);
-          updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
+          applyHistoryUI();
         });
     });
 
@@ -1089,6 +1138,8 @@
                 noshow: result.noshow,
                 reason: isRecruitIncreased ? reasonStr : undefined
               });
+              var programNameForCache = (apiPayload && apiPayload.programName) || (getProgramById(lib, progId) && getProgramById(lib, progId).name) || progId;
+              saveHistoryToCache(getHistoryCacheKey(lib, programNameForCache), historyLog[key]);
               clearSessionDateOverride(lib, progId);
               renderHistoryList(lib, progId, true);
               if (attendInput) attendInput.value = '0';
