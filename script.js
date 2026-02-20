@@ -7,6 +7,7 @@
   'use strict';
 
   var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwTDaThDRdfWmD-8jVP1FJ3oP5IPNofpkAxiYNW5IRYheLvirgBWwcpQh1RbNpx4m84lg/exec';
+  var CACHE_KEY_DASHBOARD = 'dashboardCache';
 
   const TYPE_PUBLIC = 'public';
   const TYPE_SMALL = 'small';
@@ -109,6 +110,26 @@
     } else {
       el.classList.add('hidden');
     }
+  }
+
+  function restoreDashboardFromCache() {
+    try {
+      var raw = localStorage.getItem(CACHE_KEY_DASHBOARD);
+      if (!raw) return null;
+      var list = JSON.parse(raw);
+      if (!Array.isArray(list) || list.length === 0) return null;
+      return list;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveDashboardToCache(libraries) {
+    try {
+      if (libraries && libraries.length) {
+        localStorage.setItem(CACHE_KEY_DASHBOARD, JSON.stringify(libraries));
+      }
+    } catch (e) { /* quota 등 무시 */ }
   }
 
   function updateSummaryCards(totals, avgRate) {
@@ -297,8 +318,8 @@
     }
   }
 
-  function fetchDashboardData() {
-    setLoading(true);
+  function fetchDashboardData(showSpinner) {
+    if (showSpinner) setLoading(true);
     var url = WEB_APP_URL + '?action=getDashboardData';
 
     fetch(url, { method: 'GET' })
@@ -309,6 +330,7 @@
       .then(function (data) {
         var list = Array.isArray(data) ? data : (data && Array.isArray(data.records) ? data.records : (data && Array.isArray(data.data) ? data.data : []));
         var libraries = mergeDashboardData(list);
+        saveDashboardToCache(libraries);
         renderDashboard(libraries);
       })
       .catch(function () {
@@ -316,12 +338,18 @@
         renderDashboard(libraries);
       })
       .finally(function () {
-        setLoading(false);
+        if (showSpinner) setLoading(false);
       });
   }
 
   function init() {
-    fetchDashboardData();
+    var cached = restoreDashboardFromCache();
+    if (cached !== null) {
+      renderDashboard(cached);
+      fetchDashboardData(false);
+    } else {
+      fetchDashboardData(true);
+    }
   }
 
   if (document.readyState === 'loading') {
