@@ -118,6 +118,34 @@ body {
   color: var(--text-secondary);
 }
 
+/* ===== 대시보드 에러 토스트 ===== */
+.dashboard-toast {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(-120%);
+  z-index: 1001;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fff;
+  background: var(--text-primary);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease;
+  pointer-events: none;
+  max-width: 90vw;
+}
+
+.dashboard-toast.dashboard-toast-visible {
+  transform: translateX(-50%) translateY(0);
+}
+
+.dashboard-toast.dashboard-toast-error {
+  background: #b91c1c;
+  color: #fff;
+}
+
 /* ===== Summary Cards (전체 누적) ===== */
 .summary-cards-section {
   margin-bottom: clamp(1.25rem, 3vw, 1.75rem);

@@ -6,7 +6,8 @@
 (function () {
   'use strict';
 
-  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwTDaThDRdfWmD-8jVP1FJ3oP5IPNofpkAxiYNW5IRYheLvirgBWwcpQh1RbNpx4m84lg/exec';
+  /** Google Apps Script Web App 배포 URL (필요 시 여기만 수정) */
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwTDaThDRdfWmD-8jVP1FJ3oP5IPNofpkAxiYNW5IRYheLvirgBWwcpQh1RbNpx4m84lg/exec';
   var CACHE_KEY_DASHBOARD = 'dashboardCache';
 
   const TYPE_PUBLIC = 'public';
@@ -27,7 +28,14 @@
     { id: 'mosaemi', name: '모새미작은도서관', type: TYPE_SMALL }
   ];
 
-  /** API 응답을 도서관별로 합치고, META 순서/타입과 병합 */
+  /** 빈칸·문자 등 예기치 않은 값도 0 이상 정수로 안전 변환 */
+  function safeNum(v) {
+    if (v == null || v === '') return 0;
+    var n = parseInt(String(v).replace(/[^\d-]/g, ''), 10);
+    return isNaN(n) || n < 0 ? 0 : n;
+  }
+
+  /** API 응답을 도서관별로 합치고, META 순서/타입과 병합 (숫자 필드 안전 파싱) */
   function mergeDashboardData(apiList) {
     if (!Array.isArray(apiList) || apiList.length === 0) {
       return LIBRARY_META.map(function (meta) {
@@ -39,9 +47,9 @@
       var name = (row.libraryName || row.name || '').trim();
       if (!name) return;
       if (!byName[name]) byName[name] = { recruit: 0, attend: 0, noshow: 0 };
-      byName[name].recruit += Number(row.recruit) || 0;
-      byName[name].attend += Number(row.attend) || 0;
-      byName[name].noshow += Number(row.noshow) || 0;
+      byName[name].recruit += safeNum(row.recruit);
+      byName[name].attend += safeNum(row.attend);
+      byName[name].noshow += safeNum(row.noshow);
     });
     return LIBRARY_META.map(function (meta) {
       var stats = byName[meta.name] || { recruit: 0, attend: 0, noshow: 0 };
@@ -49,25 +57,26 @@
         id: meta.id,
         name: meta.name,
         type: meta.type,
-        recruit: stats.recruit,
-        attend: stats.attend,
-        noshow: stats.noshow
+        recruit: safeNum(stats.recruit),
+        attend: safeNum(stats.attend),
+        noshow: safeNum(stats.noshow)
       };
     });
   }
 
   function sumStats(libraries) {
     var recruit = 0, attend = 0, noshow = 0;
-    for (var i = 0; i < libraries.length; i++) {
-      recruit += libraries[i].recruit;
-      attend += libraries[i].attend;
-      noshow += libraries[i].noshow;
+    for (var i = 0; i < (libraries && libraries.length) || 0; i++) {
+      recruit += safeNum(libraries[i].recruit);
+      attend += safeNum(libraries[i].attend);
+      noshow += safeNum(libraries[i].noshow);
     }
     return { recruit: recruit, attend: attend, noshow: noshow };
   }
 
   function formatNum(n) {
-    return Number(n).toLocaleString('ko-KR');
+    var num = safeNum(n);
+    return num.toLocaleString('ko-KR');
   }
 
   function animateValue(el, from, to, durationMs, callback) {
@@ -107,9 +116,34 @@
     if (!el) return;
     if (show) {
       el.classList.remove('hidden');
+      el.style.display = '';
     } else {
       el.classList.add('hidden');
+      el.style.display = 'none';
     }
+  }
+
+  /** 무한 로딩 방지: 성공/실패와 관계없이 스피너를 반드시 숨김 */
+  function forceHideLoading() {
+    try {
+      var el = document.getElementById('dashboardLoading');
+      if (el) {
+        el.classList.add('hidden');
+        el.style.display = 'none';
+      }
+    } catch (e) {
+      if (typeof console !== 'undefined' && console.error) console.error(e);
+    }
+  }
+
+  function showErrorToast() {
+    var el = document.getElementById('dashboardToast');
+    if (!el) return;
+    el.textContent = '데이터를 불러오는 데 실패했습니다.';
+    el.classList.add('dashboard-toast-visible', 'dashboard-toast-error');
+    setTimeout(function () {
+      el.classList.remove('dashboard-toast-visible', 'dashboard-toast-error');
+    }, 4500);
   }
 
   function restoreDashboardFromCache() {
@@ -320,25 +354,55 @@
 
   function fetchDashboardData(showSpinner) {
     if (showSpinner) setLoading(true);
-    var url = WEB_APP_URL + '?action=getDashboardData';
+    var url = SCRIPT_URL + '?action=getDashboardData';
 
     fetch(url, { method: 'GET' })
       .then(function (res) { return res.text(); })
       .then(function (text) {
-        try { return JSON.parse(text); } catch (e) { return []; }
+        var data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          if (typeof console !== 'undefined' && console.error) console.error('Dashboard JSON parse error:', e);
+          showErrorToast();
+          return null;
+        }
+        if (data && (data.error || data.err)) {
+          var errMsg = data.error || data.err || 'Unknown error';
+          if (typeof console !== 'undefined' && console.error) console.error('Dashboard API error:', errMsg);
+          showErrorToast();
+          return null;
+        }
+        return data;
       })
       .then(function (data) {
-        var list = Array.isArray(data) ? data : (data && Array.isArray(data.records) ? data.records : (data && Array.isArray(data.data) ? data.data : []));
+        var list = [];
+        if (data != null) {
+          if (Array.isArray(data)) list = data;
+          else if (Array.isArray(data.records)) list = data.records;
+          else if (Array.isArray(data.data)) list = data.data;
+        }
         var libraries = mergeDashboardData(list);
-        saveDashboardToCache(libraries);
-        renderDashboard(libraries);
+        try {
+          saveDashboardToCache(libraries);
+          renderDashboard(libraries);
+        } catch (e) {
+          if (typeof console !== 'undefined' && console.error) console.error('Dashboard render error:', e);
+          showErrorToast();
+          renderDashboard(mergeDashboardData([]));
+        }
       })
-      .catch(function () {
-        var libraries = mergeDashboardData([]);
-        renderDashboard(libraries);
+      .catch(function (err) {
+        if (typeof console !== 'undefined' && console.error) console.error('Dashboard fetch error:', err);
+        showErrorToast();
+        try {
+          renderDashboard(mergeDashboardData([]));
+        } catch (e) {
+          if (typeof console !== 'undefined' && console.error) console.error(e);
+        }
       })
       .finally(function () {
-        if (showSpinner) setLoading(false);
+        forceHideLoading();
       });
   }
 
