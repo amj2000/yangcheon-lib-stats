@@ -21,8 +21,12 @@
       <h1 class="title">양천구립도서관 프로그램 통합 대시보드</h1>
     </header>
 
-    <section class="summary-cards-section" id="summaryCardsSection" aria-label="전체 누적 통계">
+    <section class="summary-cards-section" id="summaryCardsSection" aria-label="4대 핵심 지표">
       <div class="summary-cards-grid">
+        <div class="summary-card glass">
+          <span class="summary-card-label">총 프로그램 수</span>
+          <span class="summary-card-value" id="totalProgramCount">0</span>
+        </div>
         <div class="summary-card glass">
           <span class="summary-card-label">전체 누적 모집</span>
           <span class="summary-card-value" id="totalRecruit">0</span>
@@ -34,10 +38,6 @@
         <div class="summary-card glass">
           <span class="summary-card-label">전체 누적 노쇼</span>
           <span class="summary-card-value" id="totalNoshow">0</span>
-        </div>
-        <div class="summary-card glass summary-card-rate">
-          <span class="summary-card-label">평균 참여율</span>
-          <span class="summary-card-value" id="avgParticipationRate">0%</span>
         </div>
       </div>
     </section>
