@@ -411,6 +411,8 @@
       if (inputWrap) inputWrap.style.display = 'none';
       if (finalNotice) finalNotice.style.display = 'none';
       if (completionPanel) completionPanel.style.display = 'none';
+      var submitBtnReset = document.getElementById('submitBtn');
+      if (submitBtnReset) submitBtnReset.disabled = false;
       return;
     }
 
@@ -421,6 +423,8 @@
     if (displaySession > 1 && total == null) {
       block.style.display = 'none';
       if (finalNotice) finalNotice.style.display = 'none';
+      var submitBtnReset2 = document.getElementById('submitBtn');
+      if (submitBtnReset2) submitBtnReset2.disabled = false;
       return;
     }
     block.style.display = 'block';
@@ -432,15 +436,35 @@
         totalInput.removeAttribute('readonly');
       }
       var typed = totalInput && totalInput.value.trim() !== '' ? parseInt(totalInput.value.trim(), 10) : NaN;
-      if (!isNaN(typed) && typed >= 1) {
-        var rest1 = theoreticalMax - typed;
-        if (rest1 < 0) rest1 = 0;
-        summaryEl.textContent = '총 운영회수: ' + typed + '회 (기간 중 ' + rest1 + '회 쉼)';
+      var isOverflow = !isNaN(typed) && typed >= 1 && theoreticalMax >= 1 && typed > theoreticalMax;
+      if (isOverflow) {
+        summaryEl.textContent = '운영 기간 내 가능한 최대 회수(' + theoreticalMax + '회)를 초과했습니다.';
+        summaryEl.classList.add('total-sessions-summary-error');
+        if (totalInput) totalInput.classList.add('total-sessions-input-error');
+        block.classList.add('total-sessions-block-overflow');
+        var submitBtn = document.getElementById('submitBtn');
+        if (submitBtn) submitBtn.disabled = true;
       } else {
-        summaryEl.textContent = '총 운영회수를 입력하세요.';
+        summaryEl.classList.remove('total-sessions-summary-error');
+        if (totalInput) totalInput.classList.remove('total-sessions-input-error');
+        block.classList.remove('total-sessions-block-overflow');
+        var submitBtnEl = document.getElementById('submitBtn');
+        if (submitBtnEl) submitBtnEl.disabled = false;
+        if (!isNaN(typed) && typed >= 1) {
+          var rest1 = theoreticalMax - typed;
+          if (rest1 < 0) rest1 = 0;
+          summaryEl.textContent = '총 운영회수: ' + typed + '회 (기간 중 ' + rest1 + '회 쉼)';
+        } else {
+          summaryEl.textContent = '총 운영회수를 입력하세요.';
+        }
       }
     } else {
       if (inputWrap) inputWrap.style.display = 'none';
+      summaryEl.classList.remove('total-sessions-summary-error');
+      if (totalInput) totalInput.classList.remove('total-sessions-input-error');
+      block.classList.remove('total-sessions-block-overflow');
+      var submitBtnElse = document.getElementById('submitBtn');
+      if (submitBtnElse) submitBtnElse.disabled = false;
       var userTotal = total;
       if (userTotal != null && userTotal >= 1) {
         var rest = theoreticalMax - userTotal;
