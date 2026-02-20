@@ -35,47 +35,106 @@
     return isNaN(n) || n < 0 ? 0 : n;
   }
 
-  /** 전체 데이터에서 고유 프로그램 개수 (programName Set.size) */
-  function computeTotalProgramCount(apiList) {
-    if (!Array.isArray(apiList) || apiList.length === 0) return 0;
-    var set = new Set();
-    apiList.forEach(function (row) {
-      var p = (row.programName || row.programId || row.program || '').trim();
-      if (p) set.add(p);
-    });
-    return set.size;
-  }
+  /**
+   * dashboardData 배열을 순회해 견고하게 지표 계산.
+   * - 참여/노쇼: 매 행마다 participationCount, noShowCount 로 누적.
+   * - 프로그램 수·모집: 도서관명_프로그램명 고유 키로 1회만 카운트, 모집은 프로그램당 1값(최댓값)만 합산.
+   */
+  function computeDashboardFromRows(apiList) {
+    var totalProgramCount = 0;
+    var totalRecruit = 0;
+    var totalAttend = 0;
+    var totalNoshow = 0;
+    var byKey = {};   // key -> { libraryName, programName, recruit (max) }
+    var byLibrary = {}; // libraryName -> { attend, noshow, programKeys: Set, recruitByKey: {} }
 
-  /** API 응답을 도서관별로 합치고, META 순서/타입·프로그램 수·합산(Number 방어) 병합 */
-  function mergeDashboardData(apiList) {
     if (!Array.isArray(apiList) || apiList.length === 0) {
-      return LIBRARY_META.map(function (meta) {
-        return { id: meta.id, name: meta.name, type: meta.type, programCount: 0, recruit: 0, attend: 0, noshow: 0 };
-      });
+      return {
+        totalProgramCount: 0,
+        totalRecruit: 0,
+        totalAttend: 0,
+        totalNoshow: 0,
+        libraries: LIBRARY_META.map(function (meta) {
+          return { id: meta.id, name: meta.name, type: meta.type, programCount: 0, recruit: 0, attend: 0, noshow: 0 };
+        })
+      };
     }
-    var byName = {};
+
     apiList.forEach(function (row) {
-      var name = (row.libraryName || row.name || '').trim();
-      if (!name) return;
-      if (!byName[name]) byName[name] = { recruit: 0, attend: 0, noshow: 0, programSet: new Set() };
-      byName[name].recruit += Number(safeNum(row.recruit));
-      byName[name].attend += Number(safeNum(row.attend));
-      byName[name].noshow += Number(safeNum(row.noshow));
-      var p = (row.programName || row.programId || row.program || '').trim();
-      if (p) byName[name].programSet.add(p);
+      var lib = (row.libraryName || row.name || '').trim();
+      var prog = (row.programName || row.programId || row.program || '').trim();
+      var key = lib && prog ? lib + '_' + prog : '';
+      if (!key) return;
+
+      var attendVal = Number(row.participationCount) || Number(row.attend) || 0;
+      var noshowVal = Number(row.noShowCount) || Number(row.noshow) || 0;
+      var recruitVal = Number(row.recruitmentCount) || Number(row.recruit) || 0;
+      if (attendVal < 0) attendVal = 0;
+      if (noshowVal < 0) noshowVal = 0;
+      if (recruitVal < 0) recruitVal = 0;
+
+      if (!byKey[key]) {
+        byKey[key] = { libraryName: lib, programName: prog, recruit: recruitVal };
+      } else {
+        byKey[key].recruit = Math.max(byKey[key].recruit, recruitVal);
+      }
+
+      if (!byLibrary[lib]) {
+        byLibrary[lib] = { attend: 0, noshow: 0, programKeys: [], recruitByKey: {} };
+      }
+      byLibrary[lib].attend += attendVal;
+      byLibrary[lib].noshow += noshowVal;
+      if (byLibrary[lib].programKeys.indexOf(key) === -1) {
+        byLibrary[lib].programKeys.push(key);
+      }
+      byLibrary[lib].recruitByKey[key] = byKey[key].recruit;
+
+      totalAttend += attendVal;
+      totalNoshow += noshowVal;
     });
-    return LIBRARY_META.map(function (meta) {
-      var stats = byName[meta.name] || { recruit: 0, attend: 0, noshow: 0, programSet: new Set() };
+
+    totalProgramCount = Object.keys(byKey).length;
+    Object.keys(byKey).forEach(function (k) {
+      totalRecruit += byKey[k].recruit;
+    });
+
+    var libraries = LIBRARY_META.map(function (meta) {
+      var L = byLibrary[meta.name] || { attend: 0, noshow: 0, programKeys: [], recruitByKey: {} };
+      var programCount = L.programKeys.length;
+      var recruit = 0;
+      for (var i = 0; i < L.programKeys.length; i++) {
+        recruit += L.recruitByKey[L.programKeys[i]] || 0;
+      }
       return {
         id: meta.id,
         name: meta.name,
         type: meta.type,
-        programCount: stats.programSet ? stats.programSet.size : 0,
-        recruit: Number(safeNum(stats.recruit)),
-        attend: Number(safeNum(stats.attend)),
-        noshow: Number(safeNum(stats.noshow))
+        programCount: programCount,
+        recruit: recruit,
+        attend: Number(L.attend) || 0,
+        noshow: Number(L.noshow) || 0
       };
     });
+
+    return {
+      totalProgramCount: totalProgramCount,
+      totalRecruit: totalRecruit,
+      totalAttend: totalAttend,
+      totalNoshow: totalNoshow,
+      libraries: libraries
+    };
+  }
+
+  /** @deprecated 호환용: apiList -> merge 결과만 반환 (computeDashboardFromRows 사용 권장) */
+  function mergeDashboardData(apiList) {
+    var result = computeDashboardFromRows(apiList);
+    return result.libraries;
+  }
+
+  /** 전체 고유 프로그램 수 (도서관_프로그램 키 기준) */
+  function computeTotalProgramCount(apiList) {
+    var result = computeDashboardFromRows(apiList);
+    return result.totalProgramCount;
   }
 
   function sumStats(libraries) {
@@ -185,15 +244,20 @@
     } catch (e) { /* quota 등 무시 */ }
   }
 
+  /** 상단 4대 지표 카드에 계산된 값 주입 (id 정확 매칭) */
   function updateSummaryCards(totals, totalProgramCount) {
     var elProgram = document.getElementById('totalProgramCount');
     var elRecruit = document.getElementById('totalRecruit');
     var elAttend = document.getElementById('totalAttend');
     var elNoshow = document.getElementById('totalNoshow');
-    if (elProgram) elProgram.textContent = formatNum(totalProgramCount != null ? totalProgramCount : 0);
-    if (elRecruit) elRecruit.textContent = formatNum(totals && totals.recruit != null ? totals.recruit : 0);
-    if (elAttend) elAttend.textContent = formatNum(totals && totals.attend != null ? totals.attend : 0);
-    if (elNoshow) elNoshow.textContent = formatNum(totals && totals.noshow != null ? totals.noshow : 0);
+    var programVal = totalProgramCount != null ? Number(totalProgramCount) : 0;
+    var recruitVal = totals && totals.recruit != null ? Number(totals.recruit) : 0;
+    var attendVal = totals && totals.attend != null ? Number(totals.attend) : 0;
+    var noshowVal = totals && totals.noshow != null ? Number(totals.noshow) : 0;
+    if (elProgram) elProgram.textContent = String(formatNum(programVal));
+    if (elRecruit) elRecruit.textContent = String(formatNum(recruitVal));
+    if (elAttend) elAttend.textContent = String(formatNum(attendVal));
+    if (elNoshow) elNoshow.textContent = String(formatNum(noshowVal));
   }
 
   function updateSummaryBadges(publicLibs, smallLibs) {
@@ -367,12 +431,13 @@
     });
   }
 
-  function renderDashboard(libraries, totalProgramCount) {
+  /** libraries: 도서관별 배열, totalProgramCount: 총 프로그램 수, totalsOverride: { recruit, attend, noshow } (API 직산 결과, 없으면 sumStats 사용) */
+  function renderDashboard(libraries, totalProgramCount, totalsOverride) {
     var libs = libraries && libraries.length ? libraries : [];
     var publicLibs = libs.filter(function (l) { return l.type === TYPE_PUBLIC; });
     var smallLibs = libs.filter(function (l) { return l.type === TYPE_SMALL; });
 
-    var totals = sumStats(libs);
+    var totals = totalsOverride || sumStats(libs);
     var totalProgram = totalProgramCount != null ? Number(totalProgramCount) : 0;
 
     updateSummaryCards(totals, totalProgram);
@@ -413,16 +478,23 @@
           else if (Array.isArray(data.records)) list = data.records;
           else if (Array.isArray(data.data)) list = data.data;
         }
-        var libraries = mergeDashboardData(list);
-        var totalProgramCount = computeTotalProgramCount(list);
-        var payload = { libraries: libraries, totalProgramCount: totalProgramCount };
+        var result = computeDashboardFromRows(list);
+        var payload = {
+          libraries: result.libraries,
+          totalProgramCount: result.totalProgramCount
+        };
+        var totals = {
+          recruit: result.totalRecruit,
+          attend: result.totalAttend,
+          noshow: result.totalNoshow
+        };
         try {
           saveDashboardToCache(payload);
-          renderDashboard(libraries, totalProgramCount);
+          renderDashboard(result.libraries, result.totalProgramCount, totals);
         } catch (e) {
           if (typeof console !== 'undefined' && console.error) console.error('Dashboard render error:', e);
           showErrorToast();
-          renderDashboard(mergeDashboardData([]), 0);
+          renderDashboard(result.libraries, result.totalProgramCount, totals);
         }
       })
       .catch(function (err) {
@@ -440,10 +512,16 @@
   }
 
   function init() {
+    /* 기존 잘못된 0 캐시 제거 후 새 데이터만 사용 (SWR 재사용 시 아래 3줄 삭제) */
+    try {
+      localStorage.removeItem(CACHE_KEY_DASHBOARD);
+    } catch (e) { /* 무시 */ }
+
     var cached = restoreDashboardFromCache();
-    if (cached && cached.libraries) {
+    if (cached && cached.libraries && cached.libraries.length) {
       forceHideLoading();
-      renderDashboard(cached.libraries, cached.totalProgramCount != null ? cached.totalProgramCount : 0);
+      var totals = sumStats(cached.libraries);
+      renderDashboard(cached.libraries, cached.totalProgramCount != null ? cached.totalProgramCount : 0, totals);
       fetchDashboardData(false);
     } else {
       fetchDashboardData(true);
