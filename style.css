@@ -83,6 +83,10 @@ body {
     overflow-wrap: break-word;
   }
 
+  .chart-tabs {
+    justify-content: flex-start;
+  }
+
   .chart-tab {
     font-size: 12px;
     padding: 6px 10px;
@@ -234,6 +238,10 @@ body {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .chart-tabs::-webkit-scrollbar {
