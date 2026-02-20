@@ -93,16 +93,19 @@ body {
   }
 
   .chart-tab {
-    font-size: 10.5px;
+    font-size: 10px;
     letter-spacing: -0.5px;
-    padding: 6px 2px;
     white-space: nowrap;
+    padding: 8px 0;
+    box-sizing: border-box;
     flex: 1 1 0;
     min-width: 0;
     text-align: center;
-    box-sizing: border-box;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    text-overflow: clip;
   }
 }
 
