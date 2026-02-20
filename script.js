@@ -7,7 +7,7 @@
   'use strict';
 
   /** Google Apps Script Web App 배포 URL (필요 시 여기만 수정) */
-  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwTDaThDRdfWmD-8jVP1FJ3oP5IPNofpkAxiYNW5IRYheLvirgBWwcpQh1RbNpx4m84lg/exec';
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyKYKjtd7VwF62c1pC8PmCgsqGCAqNIuNHRLIyJB6XdpWab9d_6or-13eqUr545V2ChCQ/exec';
   var CACHE_KEY_DASHBOARD = 'dashboardCache';
 
   const TYPE_PUBLIC = 'public';
