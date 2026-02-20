@@ -810,15 +810,56 @@ body {
 
 .timeline-item {
   display: flex;
-  align-items: stretch;
-  gap: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   position: relative;
   z-index: 1;
   margin-bottom: 0.5rem;
+  min-height: 2.5rem;
 }
 
 .timeline-item:last-child {
   margin-bottom: 0;
+}
+
+.history-item-left {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 52%;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.5rem;
+}
+
+.history-item-left .history-session-with-date {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  flex-wrap: nowrap;
+}
+
+.history-item-right .history-stats {
+  flex-shrink: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-item-right .history-rate {
+  flex-shrink: 0;
 }
 
 .timeline-marker {
@@ -855,8 +896,10 @@ body {
   gap: 0.35rem 0.75rem;
 }
 
-.timeline-content .history-stats {
+.timeline-content .history-stats,
+.history-item-right .history-stats {
   color: var(--text-primary);
+  font-size: 0.85rem;
 }
 
 .history-rate {

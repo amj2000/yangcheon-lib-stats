@@ -436,7 +436,9 @@
       if (inputWrap) inputWrap.style.display = 'none';
       var userTotal = total;
       if (userTotal != null && userTotal >= 1) {
-        summaryEl.textContent = '총 운영회수: ' + userTotal + '회';
+        var rest = theoreticalMax - userTotal;
+        if (rest < 0) rest = 0;
+        summaryEl.textContent = '총 운영회수: ' + userTotal + '회 (기간 중 ' + rest + '회 쉼)';
       } else {
         summaryEl.textContent = '총 운영회수를 입력하세요.';
       }
@@ -498,12 +500,12 @@
     }
   }
 
-  /** 해당 회차 기록의 운영 날짜 (저장된 date 또는 스케줄 기반) */
+  /** 해당 회차 기록의 운영 날짜 (저장된 date 또는 스케줄 기반). 예: 2026.01.10 (월) */
   function getRecordDateDisplay(rec, program) {
     var dateStr = rec.date || (program ? getSessionDateBySchedule(program, rec.session) : getTodayStr());
     var display = formatPeriodDate(dateStr);
     var dayKr = getDayOfWeekKr(dateStr);
-    return display + (dayKr ? '.' + dayKr : '');
+    return display + (dayKr ? ' (' + dayKr + ')' : '');
   }
 
   function renderHistoryList(libraryName, programId, highlightNew) {
@@ -527,10 +529,10 @@
       var liClass = 'history-item timeline-item' + (isNew ? ' history-item-new' : '');
       var dateDisplay = getRecordDateDisplay(rec, program);
       html += '<li class="' + liClass + '" data-session="' + escapeAttr(String(rec.session)) + '" tabindex="0" role="button">' +
-        '<div class="timeline-marker">' +
+        '<div class="history-item-left">' +
         '<span class="history-session-with-date">' + rec.session + '회차 | ' + dateDisplay + '</span>' + increaseIcon +
         '</div>' +
-        '<div class="timeline-content glass">' +
+        '<div class="history-item-right glass">' +
         '<span class="history-stats">모집 ' + rec.recruit + ' / 참여 ' + rec.attend + ' / 노쇼 ' + rec.noshow + '</span>' +
         '<span class="history-rate">참여율 ' + rate + '%</span>' +
         (rec.reason ? '<span class="history-reason">' + escapeHtml(rec.reason) + '</span>' : '') +
@@ -657,7 +659,8 @@
   function validate(recruitStr, attendStr, noshowStr, currentSession, prevRecruit, reasonStr) {
     var r = parseInt(recruitStr, 10);
     var a = parseInt(attendStr, 10);
-    var n = parseInt(noshowStr, 10);
+    var n = (noshowStr === '' || noshowStr == null) ? 0 : parseInt(noshowStr, 10);
+    if (isNaN(n) || n < 0) n = 0;
 
     var recruitMissing = recruitStr === '' || isNaN(r) || r < 0;
     if (recruitMissing) {
@@ -676,7 +679,6 @@
     }
 
     if (isNaN(a) || a < 0) return { ok: false, msg: '참여 인원을 올바르게 입력하세요.' };
-    if (isNaN(n) || n < 0) return { ok: false, msg: '노쇼 인원을 올바르게 입력하세요.' };
     if (a > r) return { ok: false, msg: '참여 인원은 모집 인원을 초과할 수 없습니다.' };
     if (n > r) return { ok: false, msg: '노쇼 인원은 모집 인원을 초과할 수 없습니다.' };
 
