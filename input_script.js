@@ -431,23 +431,14 @@
         if (totalInput.value.trim() === '') totalInput.value = '';
         totalInput.removeAttribute('readonly');
       }
-      var typed = totalInput && totalInput.value.trim() !== '' ? parseInt(totalInput.value.trim(), 10) : NaN;
-      if (!isNaN(typed) && typed >= 1) {
-        var rest1 = theoreticalMax - typed;
-        if (rest1 < 0) rest1 = 0;
-        summaryEl.textContent = '총 운영회수: ' + typed + '회 (기간 중 ' + rest1 + '회 쉼)';
-      } else {
-        summaryEl.textContent = '총 운영 회수를 아래에 입력하세요. (기간 중 이론적 운영일: ' + theoreticalMax + '일)';
-      }
+      summaryEl.textContent = '총 운영회수를 입력하세요.';
     } else {
       if (inputWrap) inputWrap.style.display = 'none';
       var userTotal = total;
       if (userTotal != null && userTotal >= 1) {
-        var rest = theoreticalMax - userTotal;
-        if (rest < 0) rest = 0;
-        summaryEl.textContent = '총 운영회수: ' + userTotal + '회 (기간 중 ' + rest + '회 쉼)';
+        summaryEl.textContent = '총 운영회수: ' + userTotal + '회';
       } else {
-        summaryEl.textContent = '총 운영 회수를 입력하세요.';
+        summaryEl.textContent = '총 운영회수를 입력하세요.';
       }
     }
 
@@ -489,20 +480,30 @@
     });
   }
 
-  function applyRecruitmentUI(isFirstSession, lastRecruit, recruitInput, wrapEl, reasonBlock, reasonInput) {
+  /** 1회차일 때 버튼 '입력', 2회차 이상일 때 '수정'. 모집 버튼은 1회차에서도 표시(입력 유도) */
+  function applyRecruitmentUI(displaySession, lastRecruit, recruitInput, wrapEl, reasonBlock, reasonInput) {
     if (!recruitInput || !wrapEl) return;
-    var readonly = !isFirstSession;
+    var readonly = displaySession >= 2;
     wrapEl.classList.toggle('recruit-readonly', readonly);
     recruitInput.readOnly = readonly;
     recruitInput.value = lastRecruit !== undefined && lastRecruit !== null ? String(lastRecruit) : '';
     var editBtn = document.getElementById('recruitEditBtn');
     if (editBtn) {
-      editBtn.style.display = readonly ? 'inline-flex' : 'none';
+      editBtn.textContent = displaySession === 1 ? '입력' : '수정';
+      editBtn.style.display = 'inline-flex';
     }
     if (reasonBlock) {
       reasonBlock.classList.remove('visible');
-      reasonBlock.querySelector('input').value = '';
+      if (reasonBlock.querySelector('input')) reasonBlock.querySelector('input').value = '';
     }
+  }
+
+  /** 해당 회차 기록의 운영 날짜 (저장된 date 또는 스케줄 기반) */
+  function getRecordDateDisplay(rec, program) {
+    var dateStr = rec.date || (program ? getSessionDateBySchedule(program, rec.session) : getTodayStr());
+    var display = formatPeriodDate(dateStr);
+    var dayKr = getDayOfWeekKr(dateStr);
+    return display + (dayKr ? '.' + dayKr : '');
   }
 
   function renderHistoryList(libraryName, programId, highlightNew) {
@@ -513,6 +514,7 @@
       return;
     }
     var list = getDisplayHistory(libraryName, programId);
+    var program = getProgramById(libraryName, programId);
     if (!list.length) {
       container.innerHTML = '<li class="history-empty">이전 회차 기록이 없습니다.</li>';
       return;
@@ -523,9 +525,10 @@
       var increaseIcon = rec.reason ? '<span class="history-increase-icon" aria-label="인원 증액">↑</span>' : '';
       var isNew = highlightNew && index === list.length - 1;
       var liClass = 'history-item timeline-item' + (isNew ? ' history-item-new' : '');
-      html += '<li class="' + liClass + '">' +
+      var dateDisplay = getRecordDateDisplay(rec, program);
+      html += '<li class="' + liClass + '" data-session="' + escapeAttr(String(rec.session)) + '" tabindex="0" role="button">' +
         '<div class="timeline-marker">' +
-        '<span class="history-session">' + rec.session + '회차</span>' + increaseIcon +
+        '<span class="history-session-with-date">' + rec.session + '회차 | ' + dateDisplay + '</span>' + increaseIcon +
         '</div>' +
         '<div class="timeline-content glass">' +
         '<span class="history-stats">모집 ' + rec.recruit + ' / 참여 ' + rec.attend + ' / 노쇼 ' + rec.noshow + '</span>' +
@@ -535,6 +538,78 @@
         '</li>';
     });
     container.innerHTML = html;
+    bindHistoryItemClicks(libraryName, programId);
+  }
+
+  function bindHistoryItemClicks(libraryName, programId) {
+    var items = document.querySelectorAll('#historyList li.history-item[data-session]');
+    items.forEach(function (li) {
+      var sessionNum = parseInt(li.getAttribute('data-session'), 10);
+      var openModal = function () { openEditHistoryModal(libraryName, programId, sessionNum); };
+      li.addEventListener('click', openModal);
+      li.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openModal();
+        }
+      });
+    });
+  }
+
+  function openEditHistoryModal(libraryName, programId, sessionNum) {
+    var overlay = document.getElementById('editHistoryModalOverlay');
+    var list = getDisplayHistory(libraryName, programId);
+    var program = getProgramById(libraryName, programId);
+    var rec = list.filter(function (r) { return r.session === sessionNum; })[0];
+    if (!rec || !overlay) return;
+    var dateStr = rec.date || (program ? getSessionDateBySchedule(program, rec.session) : getTodayStr());
+    document.getElementById('editHistoryDate').value = dateStr;
+    document.getElementById('editHistoryRecruit').value = rec.recruit;
+    document.getElementById('editHistoryAttend').value = rec.attend;
+    document.getElementById('editHistoryNoshow').value = rec.noshow;
+    overlay.classList.add('visible');
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay._editContext = { libraryName: libraryName, programId: programId, sessionNum: sessionNum };
+  }
+
+  function closeEditHistoryModal() {
+    var overlay = document.getElementById('editHistoryModalOverlay');
+    if (overlay) {
+      overlay.classList.remove('visible');
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay._editContext = null;
+    }
+  }
+
+  function saveEditHistoryModal() {
+    var overlay = document.getElementById('editHistoryModalOverlay');
+    if (!overlay || !overlay._editContext) return;
+    var ctx = overlay._editContext;
+    var libraryName = ctx.libraryName;
+    var programId = ctx.programId;
+    var sessionNum = ctx.sessionNum;
+    var dateVal = (document.getElementById('editHistoryDate') || {}).value || '';
+    var recruitVal = parseInt((document.getElementById('editHistoryRecruit') || {}).value, 10);
+    var attendVal = parseInt((document.getElementById('editHistoryAttend') || {}).value, 10);
+    var noshowVal = parseInt((document.getElementById('editHistoryNoshow') || {}).value, 10);
+    if (isNaN(recruitVal)) recruitVal = 0;
+    if (isNaN(attendVal)) attendVal = 0;
+    if (isNaN(noshowVal)) noshowVal = 0;
+    var key = logKey(libraryName, programId);
+    var arr = historyLog[key];
+    if (!arr) return;
+    var rec = arr.filter(function (r) { return r.session === sessionNum; })[0];
+    if (!rec) return;
+    rec.date = dateVal || rec.date;
+    rec.recruit = recruitVal;
+    rec.attend = attendVal;
+    rec.noshow = noshowVal;
+    closeEditHistoryModal();
+    renderHistoryList(libraryName, programId);
+    var attendInput = document.getElementById('attendInput');
+    var noshowInput = document.getElementById('noshowInput');
+    updateCumulativeDisplay(libraryName, programId, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
+    showToast('해당 회차 기록이 수정되었습니다.');
   }
 
   function showToast(message) {
@@ -638,7 +713,7 @@
       progSelect.disabled = true;
       showProgramDetail(null, null, null);
       updateTotalSessionsBlock('', '');
-      applyRecruitmentUI(true, '', recruitInput, recruitWrap, reasonBlock, reasonInput);
+      applyRecruitmentUI(1, '', recruitInput, recruitWrap, reasonBlock, reasonInput);
       renderHistoryList('', '');
       updateCumulativeDisplay('', '', '', '');
       if (!lib) {
@@ -663,8 +738,7 @@
       }
       var displaySession = getDisplaySessionNumber(lib, id);
       var defaultRecruit = getDefaultRecruit(lib, id);
-      var isFirst = displaySession === 1 && defaultRecruit === '';
-      applyRecruitmentUI(!isFirst, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
+      applyRecruitmentUI(displaySession, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
       renderHistoryList(lib, id);
       updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
     });
@@ -771,8 +845,10 @@
 
         var key = logKey(lib, progId);
         if (!historyLog[key]) historyLog[key] = [];
+        var sessionDateStr = getSessionDate(lib, progId);
         historyLog[key].push({
           session: sessionToSubmit,
+          date: sessionDateStr,
           recruit: result.recruit,
           attend: result.attend,
           noshow: result.noshow,
@@ -788,7 +864,10 @@
           recruitInput.classList.remove('recruit-success');
           recruitInput.readOnly = true;
           recruitWrap.classList.add('recruit-readonly');
-          if (recruitEditBtn) recruitEditBtn.style.display = 'inline-flex';
+          if (recruitEditBtn) {
+          recruitEditBtn.textContent = getDisplaySessionNumber(lib, progId) === 1 ? '입력' : '수정';
+          recruitEditBtn.style.display = 'inline-flex';
+        }
         }
         if (reasonBlock) { reasonBlock.classList.remove('visible'); reasonInput.value = ''; }
         var isFinalSession = totalSessions != null && sessionToSubmit === totalSessions;
@@ -811,6 +890,17 @@
     if (modalClose) modalClose.addEventListener('click', hideModal);
     var overlay = document.getElementById('modalOverlay');
     if (overlay) overlay.addEventListener('click', function (e) { if (e.target === overlay) hideModal(); });
+
+    var editModalOverlay = document.getElementById('editHistoryModalOverlay');
+    var editHistoryCancel = document.getElementById('editHistoryCancel');
+    var editHistorySave = document.getElementById('editHistorySave');
+    if (editHistoryCancel) editHistoryCancel.addEventListener('click', closeEditHistoryModal);
+    if (editHistorySave) editHistorySave.addEventListener('click', saveEditHistoryModal);
+    if (editModalOverlay) {
+      editModalOverlay.addEventListener('click', function (e) {
+        if (e.target === editModalOverlay) closeEditHistoryModal();
+      });
+    }
   }
 
   if (document.readyState === 'loading') {

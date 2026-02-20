@@ -329,6 +329,14 @@ body {
   background: rgba(37, 99, 235, 0.2);
 }
 
+.btn-edit-compact {
+  min-height: 28px;
+  min-width: 36px;
+  padding: 0 0.35rem;
+  font-size: 0.7rem;
+  border-radius: 6px;
+}
+
 .number-label {
   font-size: 0.75rem;
   font-weight: 500;
@@ -417,26 +425,34 @@ body {
 
 /* ===== 총 운영회수 (글래스모피즘·입력창 바로 위) ===== */
 .total-sessions-block {
-  margin-bottom: 1.25rem;
-  padding: 1rem 1.25rem;
+  margin-bottom: 0.9rem;
+  padding: 0.65rem 1rem;
   border-radius: var(--radius);
 }
+.total-sessions-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: nowrap;
+}
 .total-sessions-summary {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 0.75rem;
-  line-height: 1.45;
+  line-height: 1.4;
   letter-spacing: -0.01em;
+  flex-shrink: 0;
 }
 .total-sessions-block .total-sessions-input-wrap {
-  margin-top: 0.5rem;
+  flex-shrink: 0;
 }
-.total-sessions-block .total-sessions-input-wrap .label {
-  margin-bottom: 0.4rem;
-}
-.total-sessions-block .input-number {
-  max-width: 120px;
+.total-sessions-block .total-sessions-input {
+  width: 4.5rem;
+  min-width: 4.5rem;
+  min-height: 36px;
+  padding: 0 0.5rem;
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 /* ===== Submit ===== */
@@ -537,6 +553,93 @@ body {
 .modal-overlay.visible {
   opacity: 1;
   visibility: visible;
+}
+
+/* ===== 과거 기록 수정 모달 (글래스모피즘) ===== */
+.edit-history-modal-overlay {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1001;
+}
+.edit-history-modal-box {
+  max-width: 340px;
+  width: 100%;
+  padding: 1.25rem 1.5rem;
+  text-align: left;
+}
+.edit-history-modal-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  padding: 0;
+}
+.edit-history-form .form-block {
+  margin-bottom: 0.9rem;
+}
+.edit-history-form .form-block .label {
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+}
+.edit-history-form .input-number,
+.edit-history-form .input-text {
+  min-height: 40px;
+  width: 100%;
+}
+.edit-history-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.btn-edit-history-cancel,
+.btn-edit-history-save {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 1rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.btn-edit-history-cancel {
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: var(--text-secondary);
+}
+.btn-edit-history-cancel:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+.btn-edit-history-save {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+}
+.btn-edit-history-save:hover {
+  background: #1d4ed8;
+}
+
+/* 이전 회차 리스트: 날짜·요일 표시 + 클릭 가능 */
+.history-session-with-date {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.history-item {
+  cursor: pointer;
+  transition: background 0.05s ease;
+}
+.history-item:hover {
+  outline: none;
+}
+.history-item:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .modal-box {
