@@ -773,6 +773,51 @@ input[type="number"] {
   box-shadow: 0 4px 20px rgba(220, 38, 38, 0.35);
 }
 
+/* ===== 동기화 로딩 오버레이 ===== */
+.sync-loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+.sync-loading-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+.sync-loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem 2rem;
+  border-radius: var(--radius);
+}
+.sync-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(37, 99, 235, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: syncSpin 0.8s linear infinite;
+}
+@keyframes syncSpin {
+  to { transform: rotate(360deg); }
+}
+.sync-loading-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
 /* ===== 이전 회차 운영 기록 (타임라인) ===== */
 .history-section {
   margin-top: 1.5rem;

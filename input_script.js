@@ -665,6 +665,25 @@
     }, 2500);
   }
 
+  function showSyncLoading() {
+    var el = document.getElementById('syncLoadingOverlay');
+    if (el) { el.classList.add('visible'); el.setAttribute('aria-hidden', 'false'); }
+  }
+
+  function hideSyncLoading() {
+    var el = document.getElementById('syncLoadingOverlay');
+    if (el) { el.classList.remove('visible'); el.setAttribute('aria-hidden', 'true'); }
+  }
+
+  /** 제출·입력창만 잠금(도서관/프로그램 선택은 유지) */
+  function setFormDisabled(disabled, recruitInput, attendInput, noshowInput, totalSessionsInput, submitBtn) {
+    if (recruitInput) recruitInput.disabled = disabled;
+    if (attendInput) attendInput.disabled = disabled;
+    if (noshowInput) noshowInput.disabled = disabled;
+    if (totalSessionsInput) totalSessionsInput.disabled = disabled;
+    if (submitBtn) submitBtn.disabled = disabled;
+  }
+
   function showModal() {
     var overlay = document.getElementById('modalOverlay');
     if (!overlay) return;
@@ -694,6 +713,33 @@
       recruitChangeReason: reason || null,
       submittedAt: new Date().toISOString()
     };
+  }
+
+  /** 스프레드시트 응답 레코드를 historyLog 형식으로 정규화 */
+  function normalizeHistoryRecord(rec) {
+    if (!rec || typeof rec !== 'object') return null;
+    var session = rec.session != null ? Number(rec.session) : (rec.currentSession != null ? Number(rec.currentSession) : 0);
+    var date = rec.date || rec.sessionDate || '';
+    var recruit = rec.recruit != null ? Number(rec.recruit) : (rec.recruitmentCount != null ? Number(rec.recruitmentCount) : 0);
+    var attend = rec.attend != null ? Number(rec.attend) : (rec.participationCount != null ? Number(rec.participationCount) : 0);
+    var noshow = rec.noshow != null ? Number(rec.noshow) : (rec.noShowCount != null ? Number(rec.noShowCount) : 0);
+    var reason = rec.reason != null ? String(rec.reason) : undefined;
+    if (isNaN(session) || session < 1) return null;
+    return { session: session, date: date || undefined, recruit: recruit, attend: attend, noshow: noshow, reason: reason || undefined };
+  }
+
+  /** 구글 스프레드시트에서 해당 도서관·프로그램의 과거 기록 GET 요청 */
+  function fetchHistoryFromSheet(libraryName, programName) {
+    var url = WEB_APP_URL + '?libraryName=' + encodeURIComponent(libraryName) + '&programName=' + encodeURIComponent(programName || '');
+    return fetch(url, { method: 'GET' })
+      .then(function (res) { return res.text(); })
+      .then(function (text) {
+        try { return JSON.parse(text); } catch (e) { return []; }
+      })
+      .then(function (data) {
+        var list = Array.isArray(data) ? data : (data && Array.isArray(data.records) ? data.records : (data && Array.isArray(data.data) ? data.data : []));
+        return list.map(normalizeHistoryRecord).filter(Boolean);
+      });
   }
 
   /** Google 스프레드시트 Web App 전송용 페이로드 (CORS 대응 키 구성) */
@@ -789,16 +835,39 @@
       var program = lib && id ? getProgramById(lib, id) : null;
       showProgramDetail(lib, id, program);
       if (!lib || !id) {
-        applyRecruitmentUI(true, '', recruitInput, recruitWrap, reasonBlock, reasonInput);
+        applyRecruitmentUI(1, '', recruitInput, recruitWrap, reasonBlock, reasonInput);
         renderHistoryList('', '');
         updateCumulativeDisplay('', '', attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
         return;
       }
-      var displaySession = getDisplaySessionNumber(lib, id);
-      var defaultRecruit = getDefaultRecruit(lib, id);
-      applyRecruitmentUI(displaySession, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
-      renderHistoryList(lib, id);
-      updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
+      var totalSessionsInputEl = document.getElementById('totalSessionsInput');
+      showSyncLoading();
+      setFormDisabled(true, recruitInput, attendInput, noshowInput, totalSessionsInputEl, submitBtn);
+      fetchHistoryFromSheet(lib, program ? program.name : '')
+        .then(function (records) {
+          var key = logKey(lib, id);
+          historyLog[key] = Array.isArray(records) ? records : [];
+          hideSyncLoading();
+          setFormDisabled(false, recruitInput, attendInput, noshowInput, totalSessionsInputEl, submitBtn);
+          updateSessionDateRow(lib, id);
+          updateTotalSessionsBlock(lib, id);
+          var displaySession = getDisplaySessionNumber(lib, id);
+          var defaultRecruit = getDefaultRecruit(lib, id);
+          applyRecruitmentUI(displaySession, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
+          renderHistoryList(lib, id);
+          updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
+        })
+        .catch(function () {
+          hideSyncLoading();
+          setFormDisabled(false, recruitInput, attendInput, noshowInput, totalSessionsInputEl, submitBtn);
+          updateSessionDateRow(lib, id);
+          updateTotalSessionsBlock(lib, id);
+          var displaySession = getDisplaySessionNumber(lib, id);
+          var defaultRecruit = getDefaultRecruit(lib, id);
+          applyRecruitmentUI(displaySession, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
+          renderHistoryList(lib, id);
+          updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
+        });
     });
 
     function attachCumulativeListeners() {
