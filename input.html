@@ -13,14 +13,22 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="syncLoadingOverlay" class="sync-loading-overlay" aria-live="polite" aria-hidden="true">
     <div class="sync-loading-box glass">
-      <div class="sync-loading-spinner" aria-hidden="true"></div>
+      <div class="sync-loading-spinner" aria-hidden="true"><span class="sync-loading-dot"></span></div>
       <p class="sync-loading-text">데이터를 동기화 중입니다...</p>
     </div>
   </div>
   <div class="page-wrap">
-    <header class="header">
-      <h1 class="title">프로그램 통계 입력</h1>
-      <p class="subtitle">도서관과 프로그램을 선택한 뒤 참여 현황을 입력하세요.</p>
+    <header class="header header-with-user">
+      <div class="header-top">
+        <div class="header-titles">
+          <h1 class="title">프로그램 통계 입력</h1>
+          <p class="subtitle">도서관과 프로그램을 선택한 뒤 참여 현황을 입력하세요.</p>
+        </div>
+        <div class="user-bar">
+          <span id="userName" class="user-name" aria-live="polite"></span>
+          <button type="button" id="btnLogout" class="btn-logout" aria-label="로그아웃">로그아웃</button>
+        </div>
+      </div>
     </header>
 
     <main class="main">
@@ -129,6 +137,11 @@
         <div class="form-block">
           <label class="label" for="editHistoryNoshow">노쇼(명)</label>
           <input type="number" id="editHistoryNoshow" class="input-number" min="0" inputmode="numeric" pattern="[0-9]*" aria-label="노쇼(명)">
+        </div>
+        <div class="form-block">
+          <label class="label" for="editHistoryReason">변경사유 <span class="required-dot">*</span></label>
+          <input type="text" id="editHistoryReason" class="input-text" placeholder="예: 입력오류 수정" maxlength="200" aria-required="true">
+          <p class="edit-history-reason-hint">형식: [변경한 항목] 변경사유(수정자), 수정일시 — 저장 시 자동 기록됩니다.</p>
         </div>
         <div class="edit-history-actions">
           <button type="button" id="editHistoryCancel" class="btn-edit-history-cancel">취소</button>

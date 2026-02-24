@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 — 양천구립도서관 프로그램 통계</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <h1 class="login-title">프로그램 통계</h1>
+      <p class="login-subtitle">양천구립도서관 담당자 로그인</p>
+
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="login" role="tab" aria-selected="true" id="tabLogin">로그인</button>
+        <button type="button" class="tab" data-tab="register" role="tab" aria-selected="false" id="tabRegister">회원가입</button>
+      </div>
+
+      <div id="panelLogin" class="panel active" role="tabpanel" aria-labelledby="tabLogin">
+        <form class="login-form" id="formLogin" novalidate>
+          <div class="field">
+            <label class="label" for="loginLibrary">소속 도서관</label>
+            <select id="loginLibrary" class="input-select" required aria-required="true">
+              <option value="">도서관 선택</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label" for="loginName">이름</label>
+            <input type="text" id="loginName" class="input-text" required placeholder="이름 입력" aria-required="true" autocomplete="name">
+          </div>
+          <div class="field">
+            <label class="label" for="loginPassword">비밀번호</label>
+            <input type="password" id="loginPassword" class="input-text" required placeholder="비밀번호" aria-required="true" autocomplete="current-password">
+          </div>
+          <p id="loginError" class="form-error" aria-live="polite"></p>
+          <button type="submit" class="btn-primary" id="btnLoginSubmit">로그인</button>
+        </form>
+      </div>
+
+      <div id="panelRegister" class="panel" role="tabpanel" aria-labelledby="tabRegister" hidden>
+        <form class="login-form" id="formRegister" novalidate>
+          <div class="field">
+            <label class="label" for="registerLibrary">소속 도서관</label>
+            <select id="registerLibrary" class="input-select" required aria-required="true">
+              <option value="">도서관 선택</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label" for="registerName">이름</label>
+            <input type="text" id="registerName" class="input-text" required placeholder="이름 입력" aria-required="true" autocomplete="name">
+          </div>
+          <div class="field">
+            <label class="label" for="registerPassword">비밀번호</label>
+            <input type="password" id="registerPassword" class="input-text" required placeholder="비밀번호 설정" aria-required="true" autocomplete="new-password">
+          </div>
+          <p id="registerError" class="form-error" aria-live="polite"></p>
+          <button type="submit" class="btn-primary" id="btnRegisterSubmit">가입하기</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script src="login_script.js"></script>
+</body>
+</html>

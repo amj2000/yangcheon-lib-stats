@@ -7,7 +7,7 @@
   'use strict';
 
   /** Google Apps Script Web App 배포 URL (필요 시 여기만 수정) */
-  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyKYKjtd7VwF62c1pC8PmCgsqGCAqNIuNHRLIyJB6XdpWab9d_6or-13eqUr545V2ChCQ/exec';
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqqXTPIpN52xf_gS_TyBCWxEjlFo_2SWIFZx2OmvsRYjXiSwfG35YZvW1l9Ncsk6Kkkg/exec';
   var CACHE_KEY_DASHBOARD = 'dashboardCache';
 
   const TYPE_PUBLIC = 'public';
@@ -212,7 +212,7 @@
   function showErrorToast() {
     var el = document.getElementById('dashboardToast');
     if (!el) return;
-    el.textContent = '데이터를 불러오는 데 실패했습니다.';
+    el.textContent = '데이터를 불러올 수 없습니다. 잠시 후 다시 시도해 주세요.';
     el.classList.add('dashboard-toast-visible', 'dashboard-toast-error');
     setTimeout(function () {
       el.classList.remove('dashboard-toast-visible', 'dashboard-toast-error');
@@ -474,7 +474,7 @@
     if (showSpinner) setLoading(true);
     var url = SCRIPT_URL + '?action=getDashboardData';
 
-    fetch(url, { method: 'GET' })
+    fetch(url, { method: 'GET', redirect: 'follow' })
       .then(function (res) { return res.text(); })
       .then(function (text) {
         var data;

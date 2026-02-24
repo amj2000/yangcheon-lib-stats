@@ -6,8 +6,19 @@
 (function () {
   'use strict';
 
+  /** 접근 제어: 로그인하지 않으면 로그인 페이지로 */
+  try {
+    if (!localStorage.getItem('currentUser')) {
+      window.location.href = 'login.html';
+      return;
+    }
+  } catch (e) {
+    window.location.href = 'login.html';
+    return;
+  }
+
   /** Google Apps Script Web App URL */
-  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyKYKjtd7VwF62c1pC8PmCgsqGCAqNIuNHRLIyJB6XdpWab9d_6or-13eqUr545V2ChCQ/exec';
+  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzqqXTPIpN52xf_gS_TyBCWxEjlFo_2SWIFZx2OmvsRYjXiSwfG35YZvW1l9Ncsk6Kkkg/exec';
 
   /** SWR 캐시 키 (프로그램 목록) */
   var CACHE_KEY_PROGRAMS = 'cachedPrograms';
@@ -26,10 +37,10 @@
     return s;
   }
 
-  /** 시트 한 행을 내부 프로그램 객체로 정규화 (period.start/end는 YYYY-MM-DD 유지) */
+  /** 시트 한 행을 내부 프로그램 객체로 정규화 (period.start/end는 YYYY-MM-DD 유지). 도서관/프로그램명 trim으로 매칭 안정화 */
   function normalizeProgramFromSheet(row) {
-    var lib = row.libraryName != null ? row.libraryName : (row.library != null ? row.library : '');
-    var prog = row.programName != null ? row.programName : (row.program != null ? row.program : '');
+    var lib = String(row.libraryName != null ? row.libraryName : (row.library != null ? row.library : '')).trim();
+    var prog = String(row.programName != null ? row.programName : (row.program != null ? row.program : '')).trim();
     if (!row || !lib || !prog) return null;
     var startRaw = row.startDate != null ? row.startDate : (row.start_date != null ? row.start_date : '');
     var endRaw = row.endDate != null ? row.endDate : (row.end_date != null ? row.end_date : '');
@@ -329,9 +340,16 @@
     return dateStr >= start && dateStr <= end;
   }
 
-  /** 해당 도서관의 프로그램 목록 (fetchedPrograms에서 필터, 정규화된 형태) */
+  /** 도서관명 비교용: 공백 제거 후 비교 (시트와 로그인 값 표기 차이 허용) */
+  function normalizeLibraryName(s) {
+    return String(s || '').trim().replace(/\s+/g, '');
+  }
+
+  /** 해당 도서관의 프로그램 목록 (fetchedPrograms에서 필터). 도서관명 정규화 비교 */
   function getProgramsForLibrary(libraryName) {
-    return fetchedPrograms.filter(function (p) { return p.libraryName === libraryName; });
+    var key = normalizeLibraryName(libraryName);
+    if (!key) return [];
+    return fetchedPrograms.filter(function (p) { return normalizeLibraryName(p.libraryName) === key; });
   }
 
   /** 해당 도서관의 프로그램 목록 (날짜 필터 없이 전체 반환) */
@@ -339,10 +357,12 @@
     return getProgramsForLibrary(libraryName);
   }
 
-  /** 도서관명 + 프로그램명(또는 id)으로 프로그램 객체 반환 */
+  /** 도서관명 + 프로그램명(또는 id)으로 프로그램 객체 반환. 도서관명 정규화 비교 */
   function getProgramById(libraryName, programId) {
+    var key = normalizeLibraryName(libraryName);
+    if (!key) return null;
     for (var i = 0; i < fetchedPrograms.length; i++) {
-      if (fetchedPrograms[i].libraryName === libraryName && (fetchedPrograms[i].id === programId || fetchedPrograms[i].name === programId))
+      if (normalizeLibraryName(fetchedPrograms[i].libraryName) === key && (fetchedPrograms[i].id === programId || fetchedPrograms[i].name === programId))
         return fetchedPrograms[i];
     }
     return null;
@@ -358,15 +378,29 @@
     return String(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  /** fetchedPrograms에서 도서관명 중복 제거 후 도서관 드롭다운 옵션 생성 */
+  /** fetchedPrograms에서 도서관명 중복 제거 후 도서관 드롭다운 옵션 생성. 로그인 사용자 소속 도서관은 항상 포함. 정규화로 공백 차이 무시 */
   function buildLibraryOptions() {
     var seen = {};
     var libs = [];
     for (var i = 0; i < fetchedPrograms.length; i++) {
       var lib = fetchedPrograms[i].libraryName;
-      if (lib && !seen[lib]) { seen[lib] = true; libs.push(lib); }
+      if (!lib) continue;
+      var n = normalizeLibraryName(lib);
+      if (!seen[n]) { seen[n] = lib; libs.push(lib); }
     }
-    libs.sort();
+    try {
+      var raw = localStorage.getItem('currentUser');
+      if (raw) {
+        var user = JSON.parse(raw);
+        if (user && user.library) {
+          var userLib = String(user.library).trim();
+          if (userLib && !seen[normalizeLibraryName(userLib)]) {
+            libs.push(userLib);
+            libs.sort();
+          }
+        }
+      }
+    } catch (e) { /* 무시 */ }
     var html = '<option value="">도서관을 선택하세요</option>';
     libs.forEach(function (lib) {
       html += '<option value="' + escapeAttr(lib) + '">' + escapeHtml(lib) + '</option>';
@@ -611,17 +645,16 @@
     if (!container) return;
     if (!libraryName || !programId) {
       if (section) section.style.display = 'none';
-      container.innerHTML = '';
+      container.innerHTML = '<li class="history-empty">도서관과 프로그램을 선택하면 이전 회차 기록이 표시됩니다.</li>';
       return;
     }
     var list = getDisplayHistory(libraryName, programId);
     var program = getProgramById(libraryName, programId);
+    if (section) section.style.display = '';
     if (!list.length) {
-      if (section) section.style.display = 'none';
-      container.innerHTML = '';
+      container.innerHTML = '<li class="history-empty">이전 회차 기록이 없습니다.</li>';
       return;
     }
-    if (section) section.style.display = '';
     var html = '';
     list.forEach(function (rec, index) {
       var rate = participationRate(rec.recruit, rec.attend);
@@ -634,8 +667,10 @@
         '<span class="history-session-with-date">' + rec.session + '회차 | ' + dateDisplay + '</span>' + increaseIcon +
         '</div>' +
         '<div class="history-item-right glass">' +
+        '<div class="history-item-right-row">' +
         '<span class="history-stats">모집 ' + rec.recruit + '/참여 ' + rec.attend + '/노쇼 ' + rec.noshow + '</span>' +
         '<span class="history-rate">참여율 ' + rate + '%</span>' +
+        '</div>' +
         (rec.reason ? '<span class="history-reason">' + escapeHtml(rec.reason) + '</span>' : '') +
         '</div>' +
         '</li>';
@@ -670,9 +705,11 @@
     document.getElementById('editHistoryRecruit').value = rec.recruit;
     document.getElementById('editHistoryAttend').value = rec.attend;
     document.getElementById('editHistoryNoshow').value = rec.noshow;
+    var reasonEl = document.getElementById('editHistoryReason');
+    if (reasonEl) reasonEl.value = '';
     overlay.classList.add('visible');
     overlay.setAttribute('aria-hidden', 'false');
-    overlay._editContext = { libraryName: libraryName, programId: programId, sessionNum: sessionNum };
+    overlay._editContext = { libraryName: libraryName, programId: programId, sessionNum: sessionNum, originalRec: { date: dateToStr(toDate(raw)), recruit: rec.recruit, attend: rec.attend, noshow: rec.noshow, reason: rec.reason } };
   }
 
   function closeEditHistoryModal() {
@@ -684,6 +721,20 @@
     }
   }
 
+  /** 변경사유 형식: [변경한 항목] 변경사유(수정자이름), 수정일시. 예: [참석자수] 입력오류(안미정), 20260101 10:10:00 */
+  function formatChangeReason(changedItems, reasonText, editorName) {
+    var now = new Date();
+    var y = now.getFullYear();
+    var m = String(now.getMonth() + 1).padStart(2, '0');
+    var d = String(now.getDate()).padStart(2, '0');
+    var h = String(now.getHours()).padStart(2, '0');
+    var min = String(now.getMinutes()).padStart(2, '0');
+    var sec = String(now.getSeconds()).padStart(2, '0');
+    var dateTimeStr = '' + y + m + d + ' ' + h + ':' + min + ':' + sec;
+    var label = changedItems.length ? '[' + changedItems.join(', ') + '] ' : '';
+    return label + (reasonText || '수정') + '(' + (editorName || '') + '), ' + dateTimeStr;
+  }
+
   function saveEditHistoryModal() {
     var overlay = document.getElementById('editHistoryModalOverlay');
     if (!overlay || !overlay._editContext) return;
@@ -691,13 +742,55 @@
     var libraryName = ctx.libraryName;
     var programId = ctx.programId;
     var sessionNum = ctx.sessionNum;
+    var original = ctx.originalRec || {};
     var dateVal = (document.getElementById('editHistoryDate') || {}).value || '';
     var recruitVal = parseInt((document.getElementById('editHistoryRecruit') || {}).value, 10);
     var attendVal = parseInt((document.getElementById('editHistoryAttend') || {}).value, 10);
     var noshowVal = parseInt((document.getElementById('editHistoryNoshow') || {}).value, 10);
+    var reasonVal = (document.getElementById('editHistoryReason') || {}).value || '';
     if (isNaN(recruitVal)) recruitVal = 0;
     if (isNaN(attendVal)) attendVal = 0;
     if (isNaN(noshowVal)) noshowVal = 0;
+    var origDate = original.date || '';
+    var origRecruit = original.recruit != null ? Number(original.recruit) : 0;
+    var origAttend = original.attend != null ? Number(original.attend) : 0;
+    var origNoshow = original.noshow != null ? Number(original.noshow) : 0;
+    var changedItems = [];
+    if (dateVal !== origDate) changedItems.push('운영일자');
+    if (recruitVal !== origRecruit) changedItems.push('모집인원');
+    if (attendVal !== origAttend) changedItems.push('참석자수');
+    if (noshowVal !== origNoshow) changedItems.push('노쇼');
+    if (changedItems.length === 0) {
+      showToast('변경된 내용이 없습니다.', true);
+      return;
+    }
+    if (!reasonVal || !reasonVal.trim()) {
+      showToast('변경사유를 입력해 주세요.', true);
+      var reasonEl = document.getElementById('editHistoryReason');
+      if (reasonEl) reasonEl.focus();
+      return;
+    }
+    var editorName = '';
+    try {
+      var raw = localStorage.getItem('currentUser');
+      if (raw) {
+        var user = JSON.parse(raw);
+        editorName = (user && user.name) ? String(user.name).trim() : '';
+      }
+    } catch (e) {}
+    var changeReasonFormatted = formatChangeReason(changedItems, reasonVal.trim(), editorName);
+    var programName = (getProgramById(libraryName, programId) && getProgramById(libraryName, programId).name) || programId;
+    var payload = {
+      action: 'updateHistory',
+      libraryName: libraryName,
+      programName: programName,
+      currentSession: sessionNum,
+      sessionDate: dateVal,
+      recruitmentCount: recruitVal,
+      participationCount: attendVal,
+      noShowCount: noshowVal,
+      changeReason: changeReasonFormatted
+    };
     var key = logKey(libraryName, programId);
     var arr = historyLog[key];
     if (!arr) return;
@@ -707,6 +800,8 @@
     rec.recruit = recruitVal;
     rec.attend = attendVal;
     rec.noshow = noshowVal;
+    if (rec.reason !== undefined) rec.reason = (rec.reason ? rec.reason + '\n' : '') + changeReasonFormatted;
+    else rec.reason = changeReasonFormatted;
     var programNameForCache = (getProgramById(libraryName, programId) && getProgramById(libraryName, programId).name) || programId;
     saveHistoryToCache(getHistoryCacheKey(libraryName, programNameForCache), historyLog[key]);
     closeEditHistoryModal();
@@ -715,6 +810,38 @@
     var noshowInput = document.getElementById('noshowInput');
     updateCumulativeDisplay(libraryName, programId, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
     showToast('해당 회차 기록이 수정되었습니다.');
+    fetch(WEB_APP_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) { return res.text(); })
+      .then(function (text) {
+        try { return JSON.parse(text); } catch (e) { return {}; }
+      })
+      .then(function (data) {
+        if (data && data.result !== 'success') {
+          rec.date = original.date;
+          rec.recruit = original.recruit;
+          rec.attend = original.attend;
+          rec.noshow = original.noshow;
+          rec.reason = original.reason;
+          saveHistoryToCache(getHistoryCacheKey(libraryName, programNameForCache), historyLog[key]);
+          renderHistoryList(libraryName, programId);
+          showToast('서버에 반영되지 않았습니다. 다시 시도해 주세요.', true);
+        }
+      })
+      .catch(function () {
+        rec.date = original.date;
+        rec.recruit = original.recruit;
+        rec.attend = original.attend;
+        rec.noshow = original.noshow;
+        rec.reason = original.reason;
+        saveHistoryToCache(getHistoryCacheKey(libraryName, programNameForCache), historyLog[key]);
+        renderHistoryList(libraryName, programId);
+        showToast('서버에 반영되지 않았습니다. 다시 시도해 주세요.', true);
+      });
   }
 
   function showToast(message, isError) {
@@ -807,8 +934,8 @@
       });
   }
 
-  /** Google 스프레드시트 Web App 전송용 페이로드 (CORS 대응 키 구성) */
-  function buildApiPayload(libraryName, programName, totalSessions, currentSession, sessionDate, recruitmentCount, participationCount, noShowCount, participationRate, reason) {
+  /** Google 스프레드시트 Web App 전송용 페이로드 (CORS 대응 키 구성). submittedBy = 로그인 사용자 이름(입력자) */
+  function buildApiPayload(libraryName, programName, totalSessions, currentSession, sessionDate, recruitmentCount, participationCount, noShowCount, participationRate, reason, submittedBy) {
     return {
       libraryName: libraryName,
       programName: programName || '',
@@ -819,7 +946,8 @@
       participationCount: participationCount,
       noShowCount: noShowCount,
       participationRate: participationRate,
-      reason: reason || ''
+      reason: reason || '',
+      submittedBy: submittedBy || ''
     };
   }
 
@@ -849,7 +977,7 @@
     if (a > r) {
       return {
         ok: false,
-        msg: '오류: 참여자 수는 모집 인원을 초과할 수 없습니다. 현장 접수자가 있다면 모집 인원을 먼저 수정해 주세요.',
+        msg: '참여자 수는 모집 인원을 초과할 수 없습니다. 현장 접수자가 있다면 모집 인원을 먼저 수정해 주세요.',
         highlightAttend: true
       };
     }
@@ -857,7 +985,7 @@
     if (n > absent) {
       return {
         ok: false,
-        msg: '오류: 노쇼 인원(' + n + '명)은 실제 결석 인원(' + absent + '명)보다 많을 수 없습니다.',
+        msg: '노쇼 인원(' + n + '명)은 실제 결석 인원(' + absent + '명)보다 많을 수 없습니다.',
         highlightNoshow: true
       };
     }
@@ -886,10 +1014,44 @@
 
     if (!libSelect || !progSelect) return;
 
+    function applyCurrentUserToLibrary() {
+      try {
+        var raw = localStorage.getItem('currentUser');
+        if (!raw) return;
+        var user = JSON.parse(raw);
+        if (!user || !user.library) return;
+        var userLib = String(user.library).trim();
+        if (!userLib) return;
+        var userKey = normalizeLibraryName(userLib);
+        var opts = libSelect.querySelectorAll('option[value]');
+        for (var i = 0; i < opts.length; i++) {
+          if (normalizeLibraryName(opts[i].value) === userKey) {
+            libSelect.value = opts[i].value;
+            break;
+          }
+        }
+        libSelect.disabled = (String(user.role || '').trim() !== '관리자');
+      } catch (e) {}
+    }
+
+    function fillProgramsForSelectedLibrary() {
+      var lib = libSelect.value.trim();
+      if (!lib) {
+        progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
+        progSelect.disabled = true;
+        return;
+      }
+      var programs = getProgramsRunningToday(lib);
+      progSelect.innerHTML = buildProgramOptions(programs);
+      progSelect.disabled = false;
+    }
+
     function renderDropdownsFromFetched() {
       libSelect.innerHTML = buildLibraryOptions();
       progSelect.innerHTML = '<option value="">도서관을 먼저 선택하세요</option>';
       progSelect.disabled = true;
+      applyCurrentUserToLibrary();
+      fillProgramsForSelectedLibrary();
     }
 
     function onProgramsReady() {
@@ -907,35 +1069,64 @@
     if (restoreProgramsFromCache()) {
       renderDropdownsFromFetched();
       attachListeners();
+      applyUserBar();
+      var libAfter = libSelect.value.trim();
+      var programsForLib = libAfter ? getProgramsRunningToday(libAfter) : [];
+      if (programsForLib.length > 0) {
+        fetchProgramsList()
+          .then(function () {
+            saveProgramsToCache();
+            var lib = libSelect.value.trim();
+            var prog = progSelect.value.trim();
+            libSelect.innerHTML = buildLibraryOptions();
+            applyCurrentUserToLibrary();
+            lib = libSelect.value.trim();
+            if (lib) {
+              var programs = getProgramsRunningToday(lib);
+              progSelect.innerHTML = buildProgramOptions(programs);
+              progSelect.disabled = false;
+              if (prog) progSelect.value = prog;
+            }
+          })
+          .catch(function () { /* 백그라운드 갱신 실패 시 캐시 화면 유지 */ });
+        return;
+      }
+      try { localStorage.removeItem(CACHE_KEY_PROGRAMS); } catch (e) {}
+      fetchedPrograms = [];
+    }
+
+    if (fetchedPrograms.length === 0) {
+      showSyncLoading();
       fetchProgramsList()
         .then(function () {
           saveProgramsToCache();
-          var lib = libSelect.value.trim();
-          var prog = progSelect.value.trim();
-          libSelect.innerHTML = buildLibraryOptions();
-          if (lib) libSelect.value = lib;
-          if (lib) {
-            var programs = getProgramsRunningToday(lib);
-            progSelect.innerHTML = buildProgramOptions(programs);
-            progSelect.disabled = false;
-            if (prog) progSelect.value = prog;
-          }
+          hideSyncLoading();
+          onProgramsReady();
+          applyUserBar();
         })
-        .catch(function () { /* 백그라운드 갱신 실패 시 캐시 화면 유지 */ });
-      return;
+        .catch(function () {
+          hideSyncLoading();
+          onProgramsError();
+          applyUserBar();
+        });
     }
 
-    showSyncLoading();
-    fetchProgramsList()
-      .then(function () {
-        saveProgramsToCache();
-        hideSyncLoading();
-        onProgramsReady();
-      })
-      .catch(function () {
-        hideSyncLoading();
-        onProgramsError();
-      });
+    function applyUserBar() {
+      try {
+        var raw = localStorage.getItem('currentUser');
+        if (!raw) return;
+        var user = JSON.parse(raw);
+        var nameEl = document.getElementById('userName');
+        var logoutBtn = document.getElementById('btnLogout');
+        if (nameEl) nameEl.textContent = user.name ? String(user.name) + ' 님' : '';
+        if (logoutBtn) {
+          logoutBtn.onclick = function () {
+            try { localStorage.removeItem('currentUser'); } catch (e) {}
+            window.location.href = 'login.html';
+          };
+        }
+      } catch (e) {}
+    }
 
     function attachListeners() {
     libSelect.addEventListener('change', function () {
@@ -1121,6 +1312,14 @@
         var isRecruitIncreased = prevRecruit != null && result.recruit > prevRecruit;
         var sessionDateStr = getSessionDate(lib, progId);
         var rate = participationRate(result.recruit, result.attend);
+        var submitterName = '';
+        try {
+          var cu = localStorage.getItem('currentUser');
+          if (cu) {
+            var u = JSON.parse(cu);
+            submitterName = (u && u.name) ? String(u.name).trim() : '';
+          }
+        } catch (e) {}
         var apiPayload = buildApiPayload(
           lib,
           program ? program.name : '',
@@ -1131,7 +1330,8 @@
           result.attend,
           result.noshow,
           rate,
-          isRecruitIncreased ? reasonStr : ''
+          isRecruitIncreased ? reasonStr : '',
+          submitterName
         );
 
         var key = logKey(lib, progId);
@@ -1190,11 +1390,12 @@
             if (recruitEditBtn) recruitEditBtn.style.display = 'inline-flex';
           }
           updateCumulativeDisplay(lib, progId, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
-          showToast('오프라인 상태이거나 서버 오류로 방금 입력한 데이터가 저장되지 않았습니다. 다시 확인해 주세요.', true);
+          showToast('방금 입력한 데이터가 저장되지 않았습니다. 연결을 확인한 뒤 다시 시도해 주세요.', true);
         }
 
         fetch(WEB_APP_URL, {
           method: 'POST',
+          redirect: 'follow',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(apiPayload)
         })
