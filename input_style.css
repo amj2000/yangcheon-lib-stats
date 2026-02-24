@@ -977,6 +977,7 @@ input[type="number"] {
   align-items: flex-end;
   gap: 0.25rem;
   padding: 0.4rem 0.5rem 0.5rem;
+  overflow: visible;
 }
 
 .history-item-right-row {
@@ -984,20 +985,24 @@ input[type="number"] {
   align-items: center;
   justify-content: flex-end;
   gap: 0.35rem;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .history-item-right .history-stats {
   flex: 0 1 auto;
   min-width: 0;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: keep-all;
   font-size: 0.85rem;
+  text-align: right;
 }
 
 .history-item-right .history-rate {
   flex-shrink: 0;
   padding: 0.15rem 0.4rem;
   font-size: 0.75rem;
+  text-align: right;
 }
 
 .timeline-marker {
@@ -1073,19 +1078,26 @@ input[type="number"] {
     grid-template-columns: 1fr;
   }
   .history-item-left {
-    flex: 0 0 120px;
-    padding: 0.4rem 0.5rem 0 0;
-    margin-right: 0.4rem;
+    flex: 0 0 100px;
+    padding: 0.4rem 0.4rem 0 0;
+    margin-right: 0.35rem;
   }
   .history-item-left .history-session-with-date {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
+    max-width: 100%;
+  }
+  .history-item-right {
+    gap: 0.3rem;
+    padding: 0.4rem 0.35rem 0.5rem;
+    min-width: 0;
+  }
+  .history-item-right-row {
+    justify-content: flex-end;
+    row-gap: 0.25rem;
   }
   .history-item-right .history-stats {
     font-size: 0.75rem;
-  }
-  .history-item-right {
-    gap: 0.35rem;
-    padding: 0.4rem 0.35rem 0.5rem;
+    line-height: 1.35;
   }
   .history-item-right .history-rate {
     padding: 0.12rem 0.35rem;
@@ -1100,6 +1112,7 @@ input[type="number"] {
   .timeline-item {
     padding: 0.4rem 0;
     margin-bottom: 0.6rem;
+    align-items: flex-start;
   }
 }
 
