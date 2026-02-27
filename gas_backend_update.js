@@ -2,8 +2,57 @@
  * Google Apps Script (GAS) Web App — doPost(e) / doGet(e)
  * - doGet: getDashboardData, getPrograms, getHistory (대시보드·통계입력 페이지)
  * - doPost: register, login, submit_data
- * 시트: 사용자관리, 입력기록(또는 통계)
+ * 시트: 사용자(또는 사용자관리), 입력기록(또는 통계)
  */
+
+// --- 공통: 비밀번호 해시 관련 ---
+function hashPassword(password) {
+  var rawHash = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    password,
+    Utilities.Charset.UTF_8
+  );
+  return rawHash.map(function (b) {
+    var v = (b < 0 ? b + 256 : b).toString(16);
+    return v.length === 1 ? '0' + v : v;
+  }).join('');
+}
+
+function isSha256Hash(value) {
+  if (typeof value !== 'string') return false;
+  if (value.length !== 64) return false;
+  return /^[0-9a-f]+$/i.test(value);
+}
+
+// 기존 사용자 시트의 비밀번호(C열)를 해시로 변환하는 마이그레이션 함수
+// 스크립트 편집기에서 수동으로 한 번 실행해 사용한다.
+function migrateUserPasswords() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('사용자관리');
+  if (!sheet) return;
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return;
+
+  var header = (data[0] || []).map(function (c) { return String(c || '').trim(); });
+  var colPassword = header.indexOf('비밀번호') >= 0 ? header.indexOf('비밀번호') : 2;
+  var startRow = 1;
+
+  var numRows = data.length - startRow;
+  if (numRows <= 0) return;
+
+  var range = sheet.getRange(startRow + 1, colPassword + 1, numRows, 1);
+  var values = range.getValues();
+
+  for (var i = 0; i < values.length; i++) {
+    var plainOrHash = values[i][0];
+    if (!plainOrHash) continue;
+    if (isSha256Hash(String(plainOrHash))) continue;
+    values[i][0] = hashPassword(String(plainOrHash));
+  }
+
+  range.setValues(values);
+}
 
 function doGet(e) {
   var result = [];
@@ -221,7 +270,8 @@ function handleRegister(e) {
     }
   }
 
-  sheet.appendRow([library.trim(), name.trim(), password, '대기', '일반']);
+  var passwordHash = hashPassword(password);
+  sheet.appendRow([library.trim(), name.trim(), passwordHash, '대기', '일반']);
   return { result: 'success', message: '회원가입이 완료되었습니다. 관리자 승인 후 이용 가능합니다.' };
 }
 
@@ -254,7 +304,9 @@ function handleLogin(e) {
   var colName = header.indexOf('이름') >= 0 ? header.indexOf('이름') : 1;
   var colPassword = header.indexOf('비밀번호') >= 0 ? header.indexOf('비밀번호') : 2;
   var colStatus = header.indexOf('승인상태') >= 0 ? header.indexOf('승인상태') : 3;
-  var colRole = header.indexOf('역할') >= 0 ? header.indexOf('역할') : 4;
+  var colRole = header.indexOf('역할') >= 0 ? header.indexOf('역할') : (header.indexOf('권한') >= 0 ? header.indexOf('권한') : 4);
+
+  var passwordHash = hashPassword(password);
 
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
@@ -263,8 +315,20 @@ function handleLogin(e) {
     if (normStr(rowLibrary) !== libraryNorm || normStr(rowName) !== nameNorm) continue;
 
     var rowPassword = (row[colPassword] != null) ? String(row[colPassword]) : '';
-    if (rowPassword !== password) {
-      return { result: 'error', message: '비밀번호가 일치하지 않습니다.' };
+
+    // 해시 저장된 경우: 해시 비교
+    if (isSha256Hash(rowPassword)) {
+      if (rowPassword !== passwordHash) {
+        return { result: 'error', message: '비밀번호가 일치하지 않습니다.' };
+      }
+    } else {
+      // 예전 평문 비밀번호인 경우: 평문 비교 + 성공 시 해시로 자동 업데이트
+      if (rowPassword !== password) {
+        return { result: 'error', message: '비밀번호가 일치하지 않습니다.' };
+      }
+      var newHash = passwordHash;
+      sheet.getRange(i + 1, colPassword + 1).setValue(newHash);
+      rowPassword = newHash;
     }
 
     var status = (row[colStatus] != null) ? String(row[colStatus]).trim() : '';
