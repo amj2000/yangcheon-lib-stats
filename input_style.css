@@ -111,6 +111,35 @@ body {
   background: rgba(37, 99, 235, 0.2);
 }
 
+/* ===== Notice Bar ===== */
+.notice-bar {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+.notice-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-bottom: 0.2rem;
+}
+.notice-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+.notice-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.notice-message {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: pre-line;
+}
+
 /* ===== Glass ===== */
 .glass {
   background: var(--glass-bg);

@@ -62,6 +62,8 @@ function doGet(e) {
       result = handleGetDashboardData();
     } else if (action === 'getPrograms') {
       result = handleGetPrograms();
+    } else if (action === 'getNotice') {
+      result = handleGetNotice();
     } else if (action === 'getHistory') {
       var lib = (e.parameter.libraryName || '').toString().trim();
       var prog = (e.parameter.programName || '').toString().trim();
@@ -114,6 +116,40 @@ function handleGetPrograms() {
   var sheet = ss.getSheetByName('프로그램목록') || ss.getSheetByName('프로그램');
   if (!sheet) return [];
   return readProgramsFromSheet(sheet);
+}
+
+// 공지 시트에서 현재 사용할 공지 1건 가져오기
+// 시트 구조 예시: A=사용(Y/N), B=제목, C=내용
+function handleGetNotice() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('공지');
+  if (!sheet) return { enabled: false };
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { enabled: false };
+
+  var header = (data[0] || []).map(function (c) { return String(c || '').trim(); });
+  var colUse = header.indexOf('사용') >= 0 ? header.indexOf('사용') : 0;
+  var colTitle = header.indexOf('제목') >= 0 ? header.indexOf('제목') : 1;
+  var colBody = header.indexOf('내용') >= 0 ? header.indexOf('내용') : 2;
+
+  var latest = null;
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var use = (row[colUse] != null) ? String(row[colUse]).trim() : '';
+    if (!use) continue;
+    if (use === 'Y' || use === 'y' || use === '1' || use === '사용' || use === '표시') {
+      latest = row;
+    }
+  }
+
+  if (!latest) return { enabled: false };
+
+  return {
+    enabled: true,
+    title: (latest[colTitle] != null) ? String(latest[colTitle]) : '',
+    message: (latest[colBody] != null) ? String(latest[colBody]) : ''
+  };
 }
 
 /** 시트에서 도서관·프로그램 목록 읽기.

@@ -28,6 +28,16 @@
   /** 구글 시트에서 가져온 프로그램 목록 (페이지 로드 시 GET ?action=getPrograms 또는 캐시로 채움) */
   var fetchedPrograms = [];
 
+  /** 공지 가져오기 (?action=getNotice) */
+  function fetchNotice() {
+    var url = WEB_APP_URL + '?action=getNotice';
+    return fetch(url, { method: 'GET' })
+      .then(function (res) { return res.text(); })
+      .then(function (text) {
+        try { return JSON.parse(text); } catch (e) { return {}; }
+      });
+  }
+
   /** 시트 날짜(ISO 또는 YYYY-MM-DD) → YYYY.MM.DD 표시용 */
   function formatSheetDate(str) {
     if (str == null || str === '') return '';
@@ -1114,18 +1124,33 @@
     function applyUserBar() {
       try {
         var raw = localStorage.getItem('currentUser');
-        if (!raw) return;
-        var user = JSON.parse(raw);
-        var nameEl = document.getElementById('userName');
-        var logoutBtn = document.getElementById('btnLogout');
-        if (nameEl) nameEl.textContent = user.name ? String(user.name) + ' 님' : '';
-        if (logoutBtn) {
-          logoutBtn.onclick = function () {
-            try { localStorage.removeItem('currentUser'); } catch (e) {}
-            window.location.href = 'login.html';
-          };
+        if (raw) {
+          var user = JSON.parse(raw);
+          var nameEl = document.getElementById('userName');
+          var logoutBtn = document.getElementById('btnLogout');
+          if (nameEl) nameEl.textContent = user.name ? String(user.name) + ' 님' : '';
+          if (logoutBtn) {
+            logoutBtn.onclick = function () {
+              try { localStorage.removeItem('currentUser'); } catch (e) {}
+              window.location.href = 'login.html';
+            };
+          }
         }
       } catch (e) {}
+
+      // 공지 표시
+      fetchNotice()
+        .then(function (data) {
+          if (!data || !data.enabled) return;
+          var bar = document.getElementById('noticeBar');
+          var titleEl = document.getElementById('noticeTitle');
+          var msgEl = document.getElementById('noticeMessage');
+          if (!bar || !titleEl || !msgEl) return;
+          titleEl.textContent = data.title || '';
+          msgEl.textContent = data.message || '';
+          bar.style.display = 'block';
+        })
+        .catch(function () { /* 공지 없거나 오류 시 무시 */ });
     }
 
     function attachListeners() {
