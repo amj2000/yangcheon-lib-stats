@@ -18,7 +18,7 @@
   }
 
   /** Google Apps Script Web App URL */
-  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzqqXTPIpN52xf_gS_TyBCWxEjlFo_2SWIFZx2OmvsRYjXiSwfG35YZvW1l9Ncsk6Kkkg/exec';
+  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzUVMIIyqDwnsFKp2KvpbNj6EDghJ0YUPzUjl9fWStXll0kgVRGFQ22hvY-SsKnEHgMpA/exec';
 
   /** SWR 캐시 키 (프로그램 목록) */
   var CACHE_KEY_PROGRAMS = 'cachedPrograms';

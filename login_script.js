@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqqXTPIpN52xf_gS_TyBCWxEjlFo_2SWIFZx2OmvsRYjXiSwfG35YZvW1l9Ncsk6Kkkg/exec';
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzUVMIIyqDwnsFKp2KvpbNj6EDghJ0YUPzUjl9fWStXll0kgVRGFQ22hvY-SsKnEHgMpA/exec';
 
   var LIBRARY_LIST = [
     '양천중앙도서관',

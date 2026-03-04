@@ -153,35 +153,67 @@ function handleGetNotice() {
 }
 
 /** 시트에서 도서관·프로그램 목록 읽기.
- *  - A=도서관명, B=프로그램명, C=시작일(날짜) 인 경우: lib=A, prog=B (프로그램목록 시트)
- *  - B=도서관, C=프로그램 인 경우: lib=B, prog=C (입력기록 등) */
+ *  프로그램목록 시트: A=도서관명, B=프로그램명, C=시작일, D=종료일, E=운영요일, F=운영시간
+ *  시작일/종료일은 YYYY-MM-DD 문자열로 반환 (시트가 YYYY.MM.DD 또는 Date인 경우 변환) */
 function readProgramsFromSheet(sheet) {
   var data = sheet.getDataRange().getValues();
   if (data.length < 2) return [];
   var firstRow = data[0] || [];
   var isHeader = firstRow.some ? firstRow.some(function (cell) { return String(cell || '').indexOf('도서관') !== -1; }) : (String(firstRow[0] || '').indexOf('도서관') !== -1);
   var startRow = isHeader ? 1 : 0;
+
+  var header = (firstRow || []).map(function (c) { return String(c || '').trim(); });
+  var colLib = header.indexOf('도서관명') >= 0 ? header.indexOf('도서관명') : 0;
+  var colProg = header.indexOf('프로그램명') >= 0 ? header.indexOf('프로그램명') : 1;
+  var colStart = header.indexOf('시작일') >= 0 ? header.indexOf('시작일') : 2;
+  var colEnd = header.indexOf('종료일') >= 0 ? header.indexOf('종료일') : 3;
+  var colDays = header.indexOf('운영요일') >= 0 ? header.indexOf('운영요일') : (header.indexOf('요일') >= 0 ? header.indexOf('요일') : 4);
+  var colTime = header.indexOf('운영시간') >= 0 ? header.indexOf('운영시간') : (header.indexOf('시간') >= 0 ? header.indexOf('시간') : 5);
+
+  function toYyyyMmDd(val) {
+    if (val == null || val === '') return '';
+    if (val instanceof Date) {
+      if (isNaN(val.getTime())) return '';
+      var y = val.getFullYear();
+      var m = val.getMonth() + 1;
+      var d = val.getDate();
+      return y + '-' + (m < 10 ? '0' + m : m) + '-' + (d < 10 ? '0' + d : d);
+    }
+    var s = String(val).trim();
+    if (s.length >= 10) {
+      var part = s.indexOf('T') !== -1 ? s.substring(0, 10) : s.substring(0, 10);
+      return part.replace(/\./g, '-');
+    }
+    return '';
+  }
+
   var seen = {};
   var out = [];
   for (var i = startRow; i < data.length; i++) {
     var row = data[i];
-    var lib = '';
-    var prog = '';
-    var cell2 = row[2] != null ? String(row[2]).trim() : '';
-    var looksLikeDate = /^\d{4}[-.]\d{1,2}[-.]\d{1,2}/.test(cell2);
-    if (cell2 !== '' && !looksLikeDate) {
-      lib = String(row[1] != null ? row[1] : '').trim();
-      prog = cell2;
-    } else {
-      lib = String(row[0] != null ? row[0] : '').trim();
-      prog = String(row[1] != null ? row[1] : '').trim();
-    }
+    var lib = (row[colLib] != null) ? String(row[colLib]).trim() : '';
+    var prog = (row[colProg] != null) ? String(row[colProg]).trim() : '';
     if (!lib || !prog) continue;
     if (lib === '도서관' || prog === '프로그램' || lib === '도서관명' || prog === '프로그램명') continue;
     var key = lib + '|' + prog;
     if (seen[key]) continue;
     seen[key] = true;
-    out.push({ libraryName: lib, programName: prog, library: lib, program: prog });
+
+    var startDate = toYyyyMmDd(row[colStart]);
+    var endDate = toYyyyMmDd(row[colEnd]);
+    var days = (row[colDays] != null) ? String(row[colDays]).trim() : '';
+    var time = (row[colTime] != null) ? String(row[colTime]).trim() : '';
+
+    out.push({
+      libraryName: lib,
+      programName: prog,
+      library: lib,
+      program: prog,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      days: days || undefined,
+      time: time || undefined
+    });
   }
   return out;
 }
