@@ -18,7 +18,7 @@
   }
 
   /** Google Apps Script Web App URL */
-  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzUVMIIyqDwnsFKp2KvpbNj6EDghJ0YUPzUjl9fWStXll0kgVRGFQ22hvY-SsKnEHgMpA/exec';
+  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxPBoFhvJYE4vh6FU7ZoXD-4bWzHbfrEHCp5hmY4ctDc2WbnqyuZLjvlwp4KT7SSYPH0Q/exec';
 
   /** SWR 캐시 키 (프로그램 목록) */
   var CACHE_KEY_PROGRAMS = 'cachedPrograms';
@@ -56,15 +56,22 @@
     var endRaw = row.endDate != null ? row.endDate : (row.end_date != null ? row.end_date : '');
     var start = startRaw !== '' && startRaw != null ? String(startRaw).trim().substring(0, 10) : '';
     var end = endRaw !== '' && endRaw != null ? String(endRaw).trim().substring(0, 10) : '';
-    if (start.length < 10) start = '';
-    if (end.length < 10) end = '';
+    // GAS에서 YYYY-MM-DD로 넘기므로, 길이 10이 아니면 빈값으로 간주
+    if (start.length !== 10) start = '';
+    if (end.length !== 10) end = '';
+    var isExhibition = false;
+    if (row.exhibition != null) {
+      var ex = String(row.exhibition).trim();
+      if (ex === '전시' || ex === 'Y' || ex === 'y' || ex === '1') isExhibition = true;
+    }
     return {
       id: prog,
       name: prog,
       libraryName: lib,
-      period: { start: start || getTodayStr(), end: end || getTodayStr() },
+      period: { start: start || getTodayStr(), end: end || start || getTodayStr() },
       days: row.days != null ? String(row.days).trim() : '',
-      time: row.time != null ? String(row.time).trim() : ''
+      time: row.time != null ? String(row.time).trim() : '',
+      isExhibition: isExhibition
     };
   }
 
@@ -284,6 +291,8 @@
   /** 운영 기간 내 요일(days)에 해당하는 이론적 전체 운영 일수 */
   function countSessionDaysInPeriod(program) {
     if (!program || !program.period) return 0;
+    // 요일 정보가 없으면 1회성 프로그램으로 간주
+    if (!program.days || !String(program.days).trim()) return 1;
     var weekdays = parseDaysToWeekdays(program.days);
     var start = parseDate(program.period.start);
     var end = program.period.end ? parseDate(program.period.end) : start;
@@ -308,6 +317,10 @@
   /** 시작일부터 요일(days)만 카운트한 N회차의 정확한 운영 날짜 (YYYY-MM-DD) */
   function getSessionDateBySchedule(program, sessionNum) {
     if (!program || sessionNum < 1) return getTodayStr();
+    // 요일 정보가 없으면 시작일을 회차 날짜로 사용 (1회성)
+    if (!program.days || !String(program.days).trim()) {
+      return program.period && program.period.start ? program.period.start : getTodayStr();
+    }
     var weekdays = parseDaysToWeekdays(program.days);
     var start = parseDate(program.period.start);
     var end = program.period.end ? parseDate(program.period.end) : null;
@@ -329,6 +342,9 @@
 
   /** 화면에 표시할 회차 = 다음에 입력할 회차 (히스토리 마지막+1, 없으면 1회차) */
   function getDisplaySessionNumber(libraryName, programId) {
+    var program = getProgramById(libraryName, programId);
+    // 요일 정보가 없으면 항상 1회차로 표시
+    if (program && (!program.days || !String(program.days).trim())) return 1;
     var h = getHistory(libraryName, programId);
     if (h.length === 0) return 1;
     var maxSession = 0;
@@ -340,6 +356,8 @@
   function getCurrentSession(libraryName, programId) {
     var program = getProgramById(libraryName, programId);
     if (!program || !program.period) return 1;
+    // 요일 정보가 없으면 항상 1회차짜리 프로그램으로 간주
+    if (!program.days || !String(program.days).trim()) return 1;
     var today = getTodayStr();
     if (today < program.period.start) return 0;
     var days = daysBetween(program.period.start, today);
@@ -484,14 +502,46 @@
     }
     var startStr = formatSheetDate(program.period.start) || formatPeriodDate(program.period.start);
     var endStr = formatSheetDate(program.period.end) || formatPeriodDate(program.period.end);
+    var isExhibition = !!(program && program.isExhibition);
+    var daysText = isExhibition ? '전시' : escapeHtml(program.days || '');
     el.innerHTML =
       '<div class="program-detail-row">' +
       '<span class="program-detail-text">운영 기간: ' + startStr + ' ~ ' + endStr + ' | ' +
-      escapeHtml(program.days) + ' | ' + escapeHtml(program.time) + '</span>' +
+      daysText + ' | ' + escapeHtml(program.time) + '</span>' +
       '</div>';
     el.classList.add('visible');
     updateSessionDateRow(libraryName, programId);
     updateTotalSessionsBlock(libraryName, programId);
+  }
+
+  function applyExhibitionMode(program, recruitInput, noshowInput, recruitEditBtn, reasonBlock) {
+    var isExhibition = !!(program && program.isExhibition);
+    if (!recruitInput || !noshowInput) return;
+    if (isExhibition) {
+      recruitInput.value = '';
+      noshowInput.value = '';
+      recruitInput.disabled = true;
+      noshowInput.disabled = true;
+      recruitInput.classList.add('input-disabled');
+      noshowInput.classList.add('input-disabled');
+      if (recruitEditBtn) {
+        recruitEditBtn.disabled = true;
+        recruitEditBtn.style.display = 'none';
+      }
+      if (reasonBlock) {
+        reasonBlock.classList.remove('visible');
+        var reasonInputEl = reasonBlock.querySelector('input');
+        if (reasonInputEl) reasonInputEl.value = '';
+      }
+    } else {
+      recruitInput.disabled = false;
+      noshowInput.disabled = false;
+      recruitInput.classList.remove('input-disabled');
+      noshowInput.classList.remove('input-disabled');
+      if (recruitEditBtn) {
+        recruitEditBtn.disabled = false;
+      }
+    }
   }
 
   function updateSessionDateRow(libraryName, programId) {
@@ -961,7 +1011,16 @@
     };
   }
 
-  function validate(recruitStr, attendStr, noshowStr, currentSession, prevRecruit, reasonStr) {
+  function validate(recruitStr, attendStr, noshowStr, currentSession, prevRecruit, reasonStr, isExhibition) {
+    // 전시 프로그램: 참석 인원만 검증
+    if (isExhibition) {
+      var aOnly = parseInt(attendStr, 10);
+      if (isNaN(aOnly) || aOnly < 0) {
+        return { ok: false, msg: '참여 인원을 올바르게 입력하세요.' };
+      }
+      return { ok: true, recruit: 0, attend: aOnly, noshow: 0 };
+    }
+
     var r = parseInt(recruitStr, 10);
     var a = parseInt(attendStr, 10);
     var n = (noshowStr === '' || noshowStr == null) ? 0 : parseInt(noshowStr, 10);
@@ -1195,6 +1254,7 @@
         applyRecruitmentUI(displaySession, defaultRecruit, recruitInput, recruitWrap, reasonBlock, reasonInput);
         renderHistoryList(lib, id);
         updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
+        applyExhibitionMode(program, recruitInput, noshowInput, recruitEditBtn, reasonBlock);
       }
 
       var cached = restoreHistoryFromCache(historyCacheKey);
@@ -1318,7 +1378,8 @@
           totalSessions = totalNum;
         }
 
-        var result = validate(recruitStr, attendStr, noshowStr, sessionToSubmit, prevRecruit, reasonStr);
+        var isExhibition = !!(program && program.isExhibition);
+        var result = validate(recruitStr, attendStr, noshowStr, sessionToSubmit, prevRecruit, reasonStr, isExhibition);
         if (!result.ok) {
           if (attendInput) attendInput.classList.remove('input-error');
           if (noshowInput) noshowInput.classList.remove('input-error');

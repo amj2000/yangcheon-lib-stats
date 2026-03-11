@@ -167,8 +167,10 @@ function readProgramsFromSheet(sheet) {
   var colProg = header.indexOf('프로그램명') >= 0 ? header.indexOf('프로그램명') : 1;
   var colStart = header.indexOf('시작일') >= 0 ? header.indexOf('시작일') : 2;
   var colEnd = header.indexOf('종료일') >= 0 ? header.indexOf('종료일') : 3;
-  var colDays = header.indexOf('운영요일') >= 0 ? header.indexOf('운영요일') : (header.indexOf('요일') >= 0 ? header.indexOf('요일') : 4);
-  var colTime = header.indexOf('운영시간') >= 0 ? header.indexOf('운영시간') : (header.indexOf('시간') >= 0 ? header.indexOf('시간') : 5);
+  // 요일은 '운영요일' 또는 '요일', 전시는 '전시' 헤더에서 읽음
+  var colDays = header.indexOf('운영요일') >= 0 ? header.indexOf('운영요일') : (header.indexOf('요일') >= 0 ? header.indexOf('요일') : -1);
+  var colTime = header.indexOf('운영시간') >= 0 ? header.indexOf('운영시간') : (header.indexOf('시간') >= 0 ? header.indexOf('시간') : -1);
+  var colExhibition = header.indexOf('전시') >= 0 ? header.indexOf('전시') : -1;
 
   function toYyyyMmDd(val) {
     if (val == null || val === '') return '';
@@ -180,9 +182,23 @@ function readProgramsFromSheet(sheet) {
       return y + '-' + (m < 10 ? '0' + m : m) + '-' + (d < 10 ? '0' + d : d);
     }
     var s = String(val).trim();
-    if (s.length >= 10) {
-      var part = s.indexOf('T') !== -1 ? s.substring(0, 10) : s.substring(0, 10);
-      return part.replace(/\./g, '-');
+    // ISO 또는 YYYY-MM-DD, YYYY.MM.DD
+    if (s.length >= 8) {
+      // T가 포함된 ISO 형식
+      if (s.indexOf('T') !== -1) {
+        var partIso = s.substring(0, 10);
+        return partIso.replace(/\./g, '-');
+      }
+      // 점(.) 또는 하이픈(-) 구분자 처리
+      var parts = s.split(/[.\-\/]/);
+      if (parts.length >= 3) {
+        var y = parts[0];
+        var m = parts[1].length === 1 ? '0' + parts[1] : parts[1];
+        var d = parts[2].length === 1 ? '0' + parts[2] : parts[2];
+        if (/^\d{4}$/.test(y) && /^\d{2}$/.test(m) && /^\d{2}$/.test(d)) {
+          return y + '-' + m + '-' + d;
+        }
+      }
     }
     return '';
   }
@@ -201,8 +217,9 @@ function readProgramsFromSheet(sheet) {
 
     var startDate = toYyyyMmDd(row[colStart]);
     var endDate = toYyyyMmDd(row[colEnd]);
-    var days = (row[colDays] != null) ? String(row[colDays]).trim() : '';
-    var time = (row[colTime] != null) ? String(row[colTime]).trim() : '';
+    var days = (colDays >= 0 && row[colDays] != null) ? String(row[colDays]).trim() : '';
+    var time = (colTime >= 0 && row[colTime] != null) ? String(row[colTime]).trim() : '';
+    var exhibitionFlag = (colExhibition >= 0 && row[colExhibition] != null) ? String(row[colExhibition]).trim() : '';
 
     out.push({
       libraryName: lib,
@@ -212,7 +229,8 @@ function readProgramsFromSheet(sheet) {
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       days: days || undefined,
-      time: time || undefined
+      time: time || undefined,
+      exhibition: exhibitionFlag || undefined
     });
   }
   return out;

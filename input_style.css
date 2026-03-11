@@ -140,6 +140,13 @@ body {
   white-space: pre-line;
 }
 
+/* Disabled number inputs (전시 등) */
+.input-disabled {
+  background: #e5e7eb !important;
+  color: #9ca3af !important;
+  cursor: not-allowed !important;
+}
+
 /* ===== Glass ===== */
 .glass {
   background: var(--glass-bg);
