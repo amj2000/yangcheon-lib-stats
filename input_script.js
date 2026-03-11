@@ -275,6 +275,21 @@
   }
 
   var DAY_NAMES_KR = ['일', '월', '화', '수', '목', '금', '토'];
+  var CHOSEONG_LIST = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+
+  function getChoseongKey(str) {
+    if (!str) return '';
+    var s = String(str).trim();
+    if (!s) return '';
+    var ch = s[0];
+    var code = ch.charCodeAt(0);
+    // 한글 가~힣 범위
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      var idx = Math.floor((code - 0xac00) / 588);
+      return CHOSEONG_LIST[idx] || ch;
+    }
+    return ch;
+  }
 
   /** program.days(예: "화, 목") → 해당 요일의 getDay() 배열 [2, 4] */
   function parseDaysToWeekdays(daysStr) {
@@ -379,7 +394,18 @@
   function getProgramsForLibrary(libraryName) {
     var key = normalizeLibraryName(libraryName);
     if (!key) return [];
-    return fetchedPrograms.filter(function (p) { return normalizeLibraryName(p.libraryName) === key; });
+    var list = fetchedPrograms.filter(function (p) { return normalizeLibraryName(p.libraryName) === key; });
+    // 프로그램명 초성 기준 오름차순 정렬
+    list.sort(function (a, b) {
+      var ka = getChoseongKey(a.name || a.id || '');
+      var kb = getChoseongKey(b.name || b.id || '');
+      if (ka < kb) return -1;
+      if (ka > kb) return 1;
+      var na = String(a.name || a.id || '');
+      var nb = String(b.name || b.id || '');
+      return na.localeCompare(nb, 'ko-KR');
+    });
+    return list;
   }
 
   /** 해당 도서관의 프로그램 목록 (날짜 필터 없이 전체 반환) */
