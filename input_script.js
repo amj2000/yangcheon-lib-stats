@@ -580,6 +580,7 @@
     }
 
     var program = getProgramById(libraryName, programId);
+    var isExhibition = !!(program && program.isExhibition);
     var displaySession = getDisplaySessionNumber(libraryName, programId);
     var total = getTotalSessions(libraryName, programId);
     var theoreticalMax = program ? countSessionDaysInPeriod(program) : 0;
@@ -592,11 +593,27 @@
     }
     block.style.display = 'block';
 
-    if (displaySession === 1 && total == null) {
+    if (isExhibition) {
+      // 전시: 총 운영회수는 항상 1, 입력 불가 + 회색 처리
+      if (inputWrap) inputWrap.style.display = 'none';
+      if (totalInput) {
+        totalInput.value = '1';
+        totalInput.disabled = true;
+        totalInput.classList.add('input-disabled');
+      }
+      summaryEl.classList.remove('total-sessions-summary-error');
+      if (totalInput) totalInput.classList.remove('total-sessions-input-error');
+      block.classList.remove('total-sessions-block-overflow');
+      summaryEl.textContent = '총 운영회수: 1회 (전시 프로그램)';
+      var submitBtnEx = document.getElementById('submitBtn');
+      if (submitBtnEx) submitBtnEx.disabled = false;
+    } else if (displaySession === 1 && total == null) {
       if (inputWrap) inputWrap.style.display = 'block';
       if (totalInput) {
         if (totalInput.value.trim() === '') totalInput.value = '';
         totalInput.removeAttribute('readonly');
+        totalInput.disabled = false;
+        totalInput.classList.remove('input-disabled');
       }
       var typed = totalInput && totalInput.value.trim() !== '' ? parseInt(totalInput.value.trim(), 10) : NaN;
       var isOverflow = !isNaN(typed) && typed >= 1 && theoreticalMax >= 1 && typed > theoreticalMax;
