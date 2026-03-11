@@ -343,9 +343,11 @@
   /** 화면에 표시할 회차 = 다음에 입력할 회차 (히스토리 마지막+1, 없으면 1회차) */
   function getDisplaySessionNumber(libraryName, programId) {
     var program = getProgramById(libraryName, programId);
-    // 요일 정보가 없으면 항상 1회차로 표시
-    if (program && (!program.days || !String(program.days).trim())) return 1;
     var h = getHistory(libraryName, programId);
+    // 전시 & 아직 기록이 없으면 1회차, 기록이 생기면 일반 로직(2회차 이후는 거의 사용 안 할 예정)
+    if (program && program.isExhibition && h.length === 0) return 1;
+    // 요일 정보가 없고 기록이 없으면 1회차
+    if (program && (!program.days || !String(program.days).trim()) && h.length === 0) return 1;
     if (h.length === 0) return 1;
     var maxSession = 0;
     h.forEach(function (rec) { if (rec.session > maxSession) maxSession = rec.session; });
