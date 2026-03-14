@@ -167,10 +167,10 @@ function readProgramsFromSheet(sheet) {
   var colProg = header.indexOf('프로그램명') >= 0 ? header.indexOf('프로그램명') : 1;
   var colStart = header.indexOf('시작일') >= 0 ? header.indexOf('시작일') : 2;
   var colEnd = header.indexOf('종료일') >= 0 ? header.indexOf('종료일') : 3;
-  // 요일은 '운영요일' 또는 '요일', 전시는 '전시' 헤더에서 읽음
+  // 요일은 '운영요일' 또는 '요일', 비고는 '비고' 헤더(과거 '전시' 호환)
   var colDays = header.indexOf('운영요일') >= 0 ? header.indexOf('운영요일') : (header.indexOf('요일') >= 0 ? header.indexOf('요일') : -1);
   var colTime = header.indexOf('운영시간') >= 0 ? header.indexOf('운영시간') : (header.indexOf('시간') >= 0 ? header.indexOf('시간') : -1);
-  var colExhibition = header.indexOf('전시') >= 0 ? header.indexOf('전시') : -1;
+  var colRemark = header.indexOf('비고') >= 0 ? header.indexOf('비고') : (header.indexOf('전시') >= 0 ? header.indexOf('전시') : -1);
 
   function toYyyyMmDd(val) {
     if (val == null || val === '') return '';
@@ -219,7 +219,7 @@ function readProgramsFromSheet(sheet) {
     var endDate = toYyyyMmDd(row[colEnd]);
     var days = (colDays >= 0 && row[colDays] != null) ? String(row[colDays]).trim() : '';
     var time = (colTime >= 0 && row[colTime] != null) ? String(row[colTime]).trim() : '';
-    var exhibitionFlag = (colExhibition >= 0 && row[colExhibition] != null) ? String(row[colExhibition]).trim() : '';
+    var remarkVal = (colRemark >= 0 && row[colRemark] != null) ? String(row[colRemark]).trim() : '';
 
     out.push({
       libraryName: lib,
@@ -230,7 +230,7 @@ function readProgramsFromSheet(sheet) {
       endDate: endDate || undefined,
       days: days || undefined,
       time: time || undefined,
-      exhibition: exhibitionFlag || undefined
+      exhibition: remarkVal || undefined
     });
   }
   return out;

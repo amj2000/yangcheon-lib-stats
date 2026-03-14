@@ -18,7 +18,7 @@
   }
 
   /** Google Apps Script Web App URL */
-  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwMuU3P-G_Ty1IdmO2eEAazvQy2uCsbxipOFZJG0C3BZWigQ7bUX-Xacd6asyCzSA6a/exec';
+  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxtPjAlDJnqZ6EmANAjProbD5-c4kXpbZRjnYgSSQ6q2PFbpF4YOJ3-ASXF-eWC1JRu/exec';
 
   /** SWR 캐시 키 (프로그램 목록) */
   var CACHE_KEY_PROGRAMS = 'cachedPrograms';
@@ -59,10 +59,11 @@
     // GAS에서 YYYY-MM-DD로 넘기므로, 길이 10이 아니면 빈값으로 간주
     if (start.length !== 10) start = '';
     if (end.length !== 10) end = '';
+    var remarkText = (row.exhibition != null && String(row.exhibition).trim() !== '') ? String(row.exhibition).trim() : '';
     var isExhibition = false;
-    if (row.exhibition != null) {
-      var ex = String(row.exhibition).trim();
-      if (ex === '전시' || ex === 'Y' || ex === 'y' || ex === '1') isExhibition = true;
+    if (remarkText) {
+      if (remarkText === '전시' || remarkText === 'Y' || remarkText === 'y' || remarkText === '1') isExhibition = true;
+      else isExhibition = true; // 연체해방 등 비고에 값이 있으면 전시와 동일 로직
     }
     return {
       id: prog,
@@ -71,7 +72,8 @@
       period: { start: start || getTodayStr(), end: end || start || getTodayStr() },
       days: row.days != null ? String(row.days).trim() : '',
       time: row.time != null ? String(row.time).trim() : '',
-      isExhibition: isExhibition
+      isExhibition: isExhibition,
+      remarkText: remarkText
     };
   }
 
@@ -531,7 +533,7 @@
     var startStr = formatSheetDate(program.period.start) || formatPeriodDate(program.period.start);
     var endStr = formatSheetDate(program.period.end) || formatPeriodDate(program.period.end);
     var isExhibition = !!(program && program.isExhibition);
-    var daysText = isExhibition ? '전시' : escapeHtml(program.days || '');
+    var daysText = isExhibition ? escapeHtml(program.remarkText || '전시') : escapeHtml(program.days || '');
     el.innerHTML =
       '<div class="program-detail-row">' +
       '<span class="program-detail-text">운영 기간: ' + startStr + ' ~ ' + endStr + ' | ' +
@@ -630,7 +632,7 @@
       summaryEl.classList.remove('total-sessions-summary-error');
       if (totalInput) totalInput.classList.remove('total-sessions-input-error');
       block.classList.remove('total-sessions-block-overflow');
-      summaryEl.textContent = '총 운영회수: 1회 (전시 프로그램)';
+      summaryEl.textContent = '총 운영회수: 1회 (' + (program.remarkText || '전시') + ')';
       var submitBtnEx = document.getElementById('submitBtn');
       if (submitBtnEx) submitBtnEx.disabled = false;
     } else if (displaySession === 1 && total == null) {
