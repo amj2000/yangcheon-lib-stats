@@ -140,6 +140,127 @@ body {
   white-space: pre-line;
 }
 
+/* ===== 공지 전용 팝업 (PC·모바일 반응형) ===== */
+.notice-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.4);
+  overflow-y: auto;
+}
+
+.notice-popup-box {
+  width: 100%;
+  max-width: 480px;
+  max-height: min(85vh, 560px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+@media (max-width: 480px) {
+  .notice-popup-overlay {
+    padding: 0.75rem;
+    align-items: flex-start;
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+  .notice-popup-box {
+    max-height: 82vh;
+  }
+}
+
+.notice-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.notice-popup-title {
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.notice-popup-content {
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.notice-popup-item {
+  margin-bottom: 1.25rem;
+}
+
+.notice-popup-item:last-child {
+  margin-bottom: 0;
+}
+
+.notice-popup-item-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.35rem 0;
+}
+
+.notice-popup-item-body {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.notice-popup-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.btn-notice-dismiss-today {
+  padding: 0.35rem 0.65rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-notice-dismiss-today:hover {
+  background: rgba(37, 99, 235, 0.2);
+}
+
+.btn-notice-close {
+  padding: 0.35rem 0.75rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-notice-close:hover {
+  filter: brightness(1.05);
+}
+
 /* Disabled number inputs (전시 등) */
 .input-disabled {
   background: #e5e7eb !important;

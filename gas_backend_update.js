@@ -69,7 +69,7 @@ function doGet(e) {
       var prog = (e.parameter.programName || '').toString().trim();
       result = handleGetHistory(lib, prog);
     } else {
-      result = { error: 'Invalid or missing action. Use getDashboardData, getPrograms, or getHistory.' };
+      result = { error: 'Invalid or missing action. Use getDashboardData, getPrograms, getNotice, or getHistory.' };
     }
   } catch (err) {
     result = { error: err.message || String(err) };
@@ -118,37 +118,37 @@ function handleGetPrograms() {
   return readProgramsFromSheet(sheet);
 }
 
-// 공지 시트에서 현재 사용할 공지 1건 가져오기
+// 공지 시트에서 사용=Y인 공지 전체 가져오기 (배열로 반환)
 // 시트 구조 예시: A=사용(Y/N), B=제목, C=내용
 function handleGetNotice() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('공지');
-  if (!sheet) return { enabled: false };
+  if (!sheet) return { enabled: false, notices: [] };
 
   var data = sheet.getDataRange().getValues();
-  if (data.length < 2) return { enabled: false };
+  if (data.length < 2) return { enabled: false, notices: [] };
 
   var header = (data[0] || []).map(function (c) { return String(c || '').trim(); });
   var colUse = header.indexOf('사용') >= 0 ? header.indexOf('사용') : 0;
   var colTitle = header.indexOf('제목') >= 0 ? header.indexOf('제목') : 1;
   var colBody = header.indexOf('내용') >= 0 ? header.indexOf('내용') : 2;
 
-  var latest = null;
+  var notices = [];
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
     var use = (row[colUse] != null) ? String(row[colUse]).trim() : '';
     if (!use) continue;
     if (use === 'Y' || use === 'y' || use === '1' || use === '사용' || use === '표시') {
-      latest = row;
+      notices.push({
+        title: (row[colTitle] != null) ? String(row[colTitle]).trim() : '',
+        message: (row[colBody] != null) ? String(row[colBody]).trim() : ''
+      });
     }
   }
 
-  if (!latest) return { enabled: false };
-
   return {
-    enabled: true,
-    title: (latest[colTitle] != null) ? String(latest[colTitle]) : '',
-    message: (latest[colBody] != null) ? String(latest[colBody]) : ''
+    enabled: notices.length > 0,
+    notices: notices
   };
 }
 

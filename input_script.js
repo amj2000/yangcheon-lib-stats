@@ -18,7 +18,7 @@
   }
 
   /** Google Apps Script Web App URL */
-  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxPBoFhvJYE4vh6FU7ZoXD-4bWzHbfrEHCp5hmY4ctDc2WbnqyuZLjvlwp4KT7SSYPH0Q/exec';
+  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwMuU3P-G_Ty1IdmO2eEAazvQy2uCsbxipOFZJG0C3BZWigQ7bUX-Xacd6asyCzSA6a/exec';
 
   /** SWR 캐시 키 (프로그램 목록) */
   var CACHE_KEY_PROGRAMS = 'cachedPrograms';
@@ -1128,6 +1128,54 @@
 
     if (!libSelect || !progSelect) return;
 
+    // 공지 팝업: 페이지 로드 직후 병렬 요청 → 응답 오면 바로 표시 (프로그램 목록 대기 없음)
+    (function requestNoticePopupEarly() {
+      fetchNotice()
+        .then(function (data) {
+          if (!data) return;
+          var notices = Array.isArray(data.notices) && data.notices.length > 0
+            ? data.notices
+            : (data.enabled && (data.title != null || data.message != null)
+              ? [{ title: data.title || '', message: data.message || '' }]
+              : []);
+          if (notices.length === 0) return;
+          var overlay = document.getElementById('noticePopupOverlay');
+          var contentEl = document.getElementById('noticePopupContent');
+          if (!overlay || !contentEl) return;
+          var today = getTodayStr();
+          try {
+            if (localStorage.getItem('noticeDismissedDate') === today) return;
+          } catch (e) {}
+          var html = '';
+          notices.forEach(function (n) {
+            html += '<div class="notice-popup-item">';
+            if (n.title) html += '<h3 class="notice-popup-item-title">' + escapeHtml(n.title) + '</h3>';
+            if (n.message) html += '<div class="notice-popup-item-body">' + escapeHtml(n.message).replace(/\n/g, '<br>') + '</div>';
+            html += '</div>';
+          });
+          contentEl.innerHTML = html || '';
+          overlay.style.display = 'flex';
+          overlay.setAttribute('aria-hidden', 'false');
+          function hideNoticePopup() {
+            overlay.style.display = 'none';
+            overlay.setAttribute('aria-hidden', 'true');
+          }
+          var closeBtn = document.getElementById('noticePopupCloseBtn');
+          var dismissBtn = document.getElementById('noticePopupDismissToday');
+          if (closeBtn) closeBtn.onclick = hideNoticePopup;
+          if (dismissBtn) {
+            dismissBtn.onclick = function () {
+              try { localStorage.setItem('noticeDismissedDate', getTodayStr()); } catch (e) {}
+              hideNoticePopup();
+            };
+          }
+          overlay.onclick = function (e) {
+            if (e.target === overlay) hideNoticePopup();
+          };
+        })
+        .catch(function () {});
+    })();
+
     function applyCurrentUserToLibrary() {
       try {
         var raw = localStorage.getItem('currentUser');
@@ -1241,20 +1289,6 @@
           }
         }
       } catch (e) {}
-
-      // 공지 표시
-      fetchNotice()
-        .then(function (data) {
-          if (!data || !data.enabled) return;
-          var bar = document.getElementById('noticeBar');
-          var titleEl = document.getElementById('noticeTitle');
-          var msgEl = document.getElementById('noticeMessage');
-          if (!bar || !titleEl || !msgEl) return;
-          titleEl.textContent = data.title || '';
-          msgEl.textContent = data.message || '';
-          bar.style.display = 'block';
-        })
-        .catch(function () { /* 공지 없거나 오류 시 무시 */ });
     }
 
     function attachListeners() {

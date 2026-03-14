@@ -39,6 +39,22 @@
       <p id="noticeMessage" class="notice-message"></p>
     </section>
 
+    <!-- 공지 전용 팝업: 사용=Y인 공지가 있을 때만 표시, 닫기 / 오늘은 그만보기 -->
+    <div id="noticePopupOverlay" class="notice-popup-overlay" role="dialog" aria-modal="true" aria-labelledby="noticePopupTitle" aria-hidden="true" style="display: none;">
+      <div class="notice-popup-box glass">
+        <div class="notice-popup-header">
+          <h2 id="noticePopupTitle" class="notice-popup-title">공지사항</h2>
+        </div>
+        <div id="noticePopupContent" class="notice-popup-content">
+          <!-- 공지 목록은 JS로 채움 -->
+        </div>
+        <div class="notice-popup-actions">
+          <button type="button" id="noticePopupDismissToday" class="btn-notice-dismiss-today">오늘은 그만보기</button>
+          <button type="button" id="noticePopupCloseBtn" class="btn-notice-close">닫기</button>
+        </div>
+      </div>
+    </div>
+
     <main class="main">
       <form class="input-form glass" id="inputForm" novalidate>
         <div class="form-block">
