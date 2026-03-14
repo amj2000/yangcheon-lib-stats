@@ -167,11 +167,16 @@
     return list.length ? list[list.length - 1].recruit : '';
   }
 
-  /** 1 ~ (표시회차-1) 전체 표시용 (historyLog만 사용, 샘플 없음) */
+  /** 1 ~ (표시회차-1) 전체 표시용. 비고 있으면 1회차 한 건만 표시 */
   function getDisplayHistory(libraryName, programId) {
+    var program = getProgramById(libraryName, programId);
+    var saved = getHistory(libraryName, programId);
+    if (program && program.isExhibition) {
+      var one = saved.filter(function (r) { return r.session === 1; })[0];
+      return one ? [one] : [];
+    }
     var nextSession = getDisplaySessionNumber(libraryName, programId);
     if (nextSession <= 1) return [];
-    var saved = getHistory(libraryName, programId);
     var bySession = {};
     saved.forEach(function (rec) { bySession[rec.session] = rec; });
     var list = [];
@@ -331,10 +336,12 @@
     return n != null && n >= 1 ? n : null;
   }
 
-  /** 시작일부터 요일(days)만 카운트한 N회차의 정확한 운영 날짜 (YYYY-MM-DD) */
+  /** 시작일부터 요일(days)만 카운트한 N회차의 정확한 운영 날짜 (YYYY-MM-DD). 비고 있으면 기간 종료일로 기록 */
   function getSessionDateBySchedule(program, sessionNum) {
     if (!program || sessionNum < 1) return getTodayStr();
-    // 요일 정보가 없으면 시작일을 회차 날짜로 사용 (1회성)
+    if (program.isExhibition && program.period) {
+      return program.period.end || program.period.start || getTodayStr();
+    }
     if (!program.days || !String(program.days).trim()) {
       return program.period && program.period.start ? program.period.start : getTodayStr();
     }
@@ -357,13 +364,11 @@
     return dateToStr(start);
   }
 
-  /** 화면에 표시할 회차 = 다음에 입력할 회차 (히스토리 마지막+1, 없으면 1회차) */
+  /** 화면에 표시할 회차 = 다음에 입력할 회차 (히스토리 마지막+1, 없으면 1회차). 비고 있으면 항상 1회차 */
   function getDisplaySessionNumber(libraryName, programId) {
     var program = getProgramById(libraryName, programId);
     var h = getHistory(libraryName, programId);
-    // 전시 & 아직 기록이 없으면 1회차, 기록이 생기면 일반 로직(2회차 이후는 거의 사용 안 할 예정)
-    if (program && program.isExhibition && h.length === 0) return 1;
-    // 요일 정보가 없고 기록이 없으면 1회차
+    if (program && program.isExhibition) return 1;
     if (program && (!program.days || !String(program.days).trim()) && h.length === 0) return 1;
     if (h.length === 0) return 1;
     var maxSession = 0;
@@ -1336,6 +1341,10 @@
         renderHistoryList(lib, id);
         updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
         applyExhibitionMode(program, recruitInput, noshowInput, recruitEditBtn, reasonBlock);
+        if (program && program.isExhibition && attendInput) {
+          var exList = getDisplayHistory(lib, id);
+          if (exList.length) attendInput.value = String(exList[0].attend);
+        }
       }
 
       var cached = restoreHistoryFromCache(historyCacheKey);
@@ -1476,6 +1485,75 @@
         if (attendInput) attendInput.classList.remove('input-error');
         if (noshowInput) noshowInput.classList.remove('input-error');
 
+        var key = logKey(lib, progId);
+        var displayList = getDisplayHistory(lib, progId);
+        var existingOne = displayList[0];
+        if (isExhibition && existingOne && existingOne.session === 1) {
+          var origAttend = existingOne.attend != null ? Number(existingOne.attend) : 0;
+          var origNoshow = existingOne.noshow != null ? Number(existingOne.noshow) : 0;
+          existingOne.attend = result.attend;
+          existingOne.noshow = result.noshow;
+          var programNameForUpdate = (getProgramById(lib, progId) && getProgramById(lib, progId).name) || progId;
+          saveHistoryToCache(getHistoryCacheKey(lib, programNameForUpdate), historyLog[key] || []);
+          renderHistoryList(lib, progId);
+          if (attendInput) attendInput.value = String(result.attend);
+          if (noshowInput) noshowInput.value = String(result.noshow);
+          updateCumulativeDisplay(lib, progId, '0', '0');
+          showToast('참석자수가 수정되었습니다.');
+          var submitterNameUpdate = '';
+          try {
+            var cuU = localStorage.getItem('currentUser');
+            if (cuU) {
+              var uU = JSON.parse(cuU);
+              submitterNameUpdate = (uU && uU.name) ? String(uU.name).trim() : '';
+            }
+          } catch (e2) {}
+          var changeReasonUpdate = '참석자수 수정' + (submitterNameUpdate ? ' - ' + submitterNameUpdate : '');
+          var updatePayload = {
+            action: 'updateHistory',
+            libraryName: lib,
+            programName: programNameForUpdate,
+            currentSession: 1,
+            sessionDate: existingOne.date || '',
+            recruitmentCount: existingOne.recruit != null ? Number(existingOne.recruit) : 0,
+            participationCount: result.attend,
+            noShowCount: result.noshow,
+            changeReason: changeReasonUpdate
+          };
+          fetch(WEB_APP_URL, {
+            method: 'POST',
+            redirect: 'follow',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(updatePayload)
+          })
+            .then(function (res) { return res.text(); })
+            .then(function (text) {
+              try { return JSON.parse(text); } catch (e) { return {}; }
+            })
+            .then(function (data) {
+              if (data && data.result === 'success') return;
+              existingOne.attend = origAttend;
+              existingOne.noshow = origNoshow;
+              saveHistoryToCache(getHistoryCacheKey(lib, programNameForUpdate), historyLog[key] || []);
+              renderHistoryList(lib, progId);
+              if (attendInput) attendInput.value = String(origAttend);
+              if (noshowInput) noshowInput.value = String(origNoshow);
+              updateCumulativeDisplay(lib, progId, '0', '0');
+              showToast('저장에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.', true);
+            })
+            .catch(function () {
+              existingOne.attend = origAttend;
+              existingOne.noshow = origNoshow;
+              saveHistoryToCache(getHistoryCacheKey(lib, programNameForUpdate), historyLog[key] || []);
+              renderHistoryList(lib, progId);
+              if (attendInput) attendInput.value = String(origAttend);
+              if (noshowInput) noshowInput.value = String(origNoshow);
+              updateCumulativeDisplay(lib, progId, '0', '0');
+              showToast('저장에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.', true);
+            });
+          return;
+        }
+
         var isRecruitIncreased = prevRecruit != null && result.recruit > prevRecruit;
         var sessionDateStr = getSessionDate(lib, progId);
         var rate = participationRate(result.recruit, result.attend);
@@ -1501,7 +1579,6 @@
           submitterName
         );
 
-        var key = logKey(lib, progId);
         if (!historyLog[key]) historyLog[key] = [];
         var optimisticRecord = {
           session: sessionToSubmit,
