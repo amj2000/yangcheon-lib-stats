@@ -7,7 +7,7 @@
   'use strict';
 
   /** Google Apps Script Web App 배포 URL (필요 시 여기만 수정) */
-  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtPjAlDJnqZ6EmANAjProbD5-c4kXpbZRjnYgSSQ6q2PFbpF4YOJ3-ASXF-eWC1JRu/exec';
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywUIUpQLT_-InN_Myn8Bs6k7etS4wP50Qr-OwW9IRczRW8PuoP4oXbMq9fL3wmJYVSbg/exec';
   var CACHE_KEY_DASHBOARD = 'dashboardCache';
 
   const TYPE_PUBLIC = 'public';
@@ -38,7 +38,7 @@
   /**
    * dashboardData 배열을 순회해 견고하게 지표 계산.
    * - 참여/노쇼: 매 행마다 participationCount, noShowCount 로 누적.
-   * - 프로그램 수·모집: 도서관명_프로그램명 고유 키로 1회만 카운트, 모집은 프로그램당 1값(최댓값)만 합산.
+   * - 프로그램 수·접수: 도서관명_프로그램명 고유 키로 1회만 카운트, 접수은 프로그램당 1값(최댓값)만 합산.
    */
   function computeDashboardFromRows(apiList) {
     var totalProgramCount = 0;
@@ -272,7 +272,7 @@
 
     function makeBadgeHtml(programCount, stats) {
       return '<span class="summary-item">프로그램: <span class="summary-num" data-target="' + Number(programCount) + '">0</span></span>' +
-        '<span class="summary-item">모집: <span class="summary-num" data-target="' + Number(stats.recruit) + '">0</span></span>' +
+        '<span class="summary-item">접수: <span class="summary-num" data-target="' + Number(stats.recruit) + '">0</span></span>' +
         '<span class="summary-item">참여: <span class="summary-num" data-target="' + Number(stats.attend) + '">0</span></span>' +
         '<span class="summary-item">노쇼: <span class="summary-num" data-target="' + Number(stats.noshow) + '">0</span></span>';
     }
@@ -324,7 +324,7 @@
           '<div class="stat-value">' + programCount + '</div>' +
           '</div>' +
           '<div class="stat-item">' +
-          '<div class="stat-label">모집 인원</div>' +
+          '<div class="stat-label">접수 인원</div>' +
           '<div class="stat-value">' + recruit + '</div>' +
           '</div>' +
           '<div class="stat-item">' +
@@ -352,7 +352,7 @@
 
   var CHART_TITLES = {
     programCount: '도서관별 프로그램 수 현황',
-    recruit: '도서관별 모집 인원 현황',
+    recruit: '도서관별 접수 인원 현황',
     attend: '도서관별 참여자 수 현황',
     noshow: '도서관별 노쇼 현황'
   };

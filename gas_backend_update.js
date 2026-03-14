@@ -78,7 +78,7 @@ function doGet(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// 입력기록 시트 열: A=타임스탬프, B=도서관명, C=프로그램명, D=총운영회수, E=현재회차, F=운영일자, G=모집인원, H=참여인원, I=노쇼, J=참여율, K=모집인원 변경사유
+// 입력기록 시트 열: A=타임스탬프, B=도서관명, C=프로그램명, D=총운영회수, E=현재회차, F=운영일자, G=접수인원, H=참여인원, I=노쇼, J=참여율, K=접수인원 변경사유
 function handleGetDashboardData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('입력기록') || ss.getSheetByName('통계');
@@ -434,7 +434,7 @@ function handleLogin(e) {
 }
 
 // --- 기존 통계 저장 (action === 'submit_data') ---
-// 입력기록 시트: A=타임스탬프, B=도서관명, C=프로그램명, D=총운영회수, E=현재회차, F=운영일자, G=모집인원, H=참여인원, I=노쇼, J=참여율, K=모집인원 변경사유, L=입력자
+// 입력기록 시트: A=타임스탬프, B=도서관명, C=프로그램명, D=총운영회수, E=현재회차, F=운영일자, G=접수인원, H=참여인원, I=노쇼, J=참여율, K=접수인원 변경사유, L=입력자
 function handleSubmitData(e) {
   if (typeof handleSubmitDataExisting === 'function') {
     return handleSubmitDataExisting(e);
@@ -448,6 +448,12 @@ function handleSubmitData(e) {
     }
     var reason = body.reason || body.recruitChangeReason || '';
     var submittedBy = (body.submittedBy != null) ? String(body.submittedBy).trim() : '';
+    var recruit = body.recruitmentCount != null ? Number(body.recruitmentCount) : 0;
+    var attend = body.participationCount != null ? Number(body.participationCount) : 0;
+    if (isNaN(recruit)) recruit = 0;
+    if (isNaN(attend)) attend = 0;
+    var rateDecimal = (recruit > 0) ? (attend / recruit) : 0;
+    rateDecimal = Math.round(rateDecimal * 10000) / 10000;
     var timestamp = new Date();
     sheet.appendRow([
       timestamp,
@@ -459,7 +465,7 @@ function handleSubmitData(e) {
       body.recruitmentCount != null ? body.recruitmentCount : '',
       body.participationCount != null ? body.participationCount : '',
       body.noShowCount != null ? body.noShowCount : '',
-      body.participationRate != null ? body.participationRate : '',
+      rateDecimal,
       reason,
       submittedBy
     ]);
@@ -512,12 +518,13 @@ function handleUpdateHistory(e) {
   if (isNaN(recruit)) recruit = 0;
   if (isNaN(attend)) attend = 0;
   if (isNaN(noshow)) noshow = 0;
-  var rate = (recruit > 0) ? Math.round((attend / recruit) * 100) : 0;
+  var rateDecimal = (recruit > 0) ? (attend / recruit) : 0;
+  rateDecimal = Math.round(rateDecimal * 10000) / 10000;
   sheet.getRange(rowIndex + 1, 6).setValue(sessionDate);
   sheet.getRange(rowIndex + 1, 7).setValue(recruit);
   sheet.getRange(rowIndex + 1, 8).setValue(attend);
   sheet.getRange(rowIndex + 1, 9).setValue(noshow);
-  sheet.getRange(rowIndex + 1, 10).setValue(rate);
+  sheet.getRange(rowIndex + 1, 10).setValue(rateDecimal);
   var existingReason = (data[rowIndex][10] != null) ? String(data[rowIndex][10]).trim() : '';
   var newReason = existingReason ? existingReason + '\n' + changeReason : changeReason;
   sheet.getRange(rowIndex + 1, 11).setValue(newReason);

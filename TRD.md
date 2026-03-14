@@ -61,7 +61,7 @@
 **입력기록 시트 읽기 규칙**
 
 - 1행이 헤더(두 번째 컬럼이 '도서관명')면 `startRow = 1`, 아니면 `startRow = 0`
-- 열 인덱스(0-based): B=1 도서관명, C=2 프로그램명, D=총운영회수, E=현재회차, F=운영일자, G=모집, H=참여, I=노쇼, J=참여율, K=변경사유
+- 열 인덱스(0-based): B=1 도서관명, C=2 프로그램명, D=총운영회수, E=현재회차, F=운영일자, G=접수, H=참여, I=노쇼, J=참여율, K=변경사유
 
 ### 3.3 doPost(e) — POST 요청
 
@@ -75,7 +75,7 @@ URL parameter로 `action`을 넘길 수도 있음.
 | `submit_data` | 회차별 입력 저장(append) | libraryName, programName, totalSessions, currentSession, sessionDate, recruitmentCount, participationCount, noShowCount, participationRate, reason(선택), **submittedBy** | `{ result: 'success' }` 또는 error |
 | `updateHistory` | 과거 회차 수정 | libraryName, programName, currentSession, sessionDate, recruitmentCount, participationCount, noShowCount, **changeReason**(필수), 수정자 정보는 changeReason 문자열 내 포함 | `{ result: 'success' }` 또는 error |
 
-- **updateHistory:** 해당 행의 F~J(운영일자, 모집, 참여, 노쇼, 참여율) 갱신, K열(변경사유)에 클라이언트에서 만든 `changeReason` 문자열을 기존 값 뒤에 `\n`으로 이어 붙여 누적 저장.
+- **updateHistory:** 해당 행의 F~J(운영일자, 접수, 참여, 노쇼, 참여율) 갱신, K열(변경사유)에 클라이언트에서 만든 `changeReason` 문자열을 기존 값 뒤에 `\n`으로 이어 붙여 누적 저장.
 
 ---
 
@@ -116,7 +116,7 @@ URL parameter로 `action`을 넘길 수도 있음.
 | D (4) | 총운영회수 | |
 | E (5) | 현재회차 | |
 | F (6) | 운영일자 | |
-| G (7) | 모집인원 | |
+| G (7) | 접수인원 | |
 | H (8) | 참여인원 | |
 | I (9) | 노쇼 | |
 | J (10) | 참여율 | (숫자, %) |
@@ -153,8 +153,8 @@ URL parameter로 `action`을 넘길 수도 있음.
 
 ### 5.3 대시보드 (script.js)
 
-- **getDashboardData:** GET `?action=getDashboardData` → 반환 배열을 집계해 총 프로그램 수, 전체 누적 모집/참여/노쇼 계산
-- **Chart.js:** 도서관별 막대 차트, 탭별 지표(프로그램 수, 모집, 참여, 노쇼) 전환
+- **getDashboardData:** GET `?action=getDashboardData` → 반환 배열을 집계해 총 프로그램 수, 전체 누적 접수/참여/노쇼 계산
+- **Chart.js:** 도서관별 막대 차트, 탭별 지표(프로그램 수, 접수, 참여, 노쇼) 전환
 - **로딩 UI:** 점 3개 튀는 스피너, 사용자 안내 문구는 「오류」「에러」 없이 안내만 표시
 
 ### 5.4 로그인 페이지 (login_script.js)
@@ -181,8 +181,8 @@ URL parameter로 `action`을 넘길 수도 있음.
 
 ## 7. 검증 규칙 (클라이언트·서버)
 
-- **모집 인원:** 1회차 필수; 2회차 이후는 이전 회차 모집 이상만 허용 (감소 불가). 증액 시 사유 필수.
-- **참여·노쇼:** 참여 ≤ 모집, 노쇼 ≤ (모집 − 참여).
+- **접수 인원:** 1회차 필수; 2회차 이후는 이전 회차 접수 이상만 허용 (감소 불가). 증액 시 사유 필수.
+- **참여·노쇼:** 참여 ≤ 접수, 노쇼 ≤ (접수 − 참여).
 - **과거 회차 수정:** changeReason 필수; 미입력 시 GAS가 `{ result: 'error', message: '변경사유를 입력해 주세요.' }` 반환.
 
 ---

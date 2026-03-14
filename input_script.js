@@ -1,6 +1,6 @@
 /**
  * 현장 담당자용 모바일 입력 페이지
- * 마스터 데이터·회차 자동 감지·이전 회차 기록·모집 인원 특수 로직
+ * 마스터 데이터·회차 자동 감지·이전 회차 기록·접수 인원 특수 로직
  */
 
 (function () {
@@ -18,7 +18,7 @@
   }
 
   /** Google Apps Script Web App URL */
-  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxtPjAlDJnqZ6EmANAjProbD5-c4kXpbZRjnYgSSQ6q2PFbpF4YOJ3-ASXF-eWC1JRu/exec';
+  var WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbywUIUpQLT_-InN_Myn8Bs6k7etS4wP50Qr-OwW9IRczRW8PuoP4oXbMq9fL3wmJYVSbg/exec';
 
   /** SWR 캐시 키 (프로그램 목록) */
   var CACHE_KEY_PROGRAMS = 'cachedPrograms';
@@ -157,7 +157,7 @@
     return h.length ? h[h.length - 1] : null;
   }
 
-  /** 프로그램 선택 시 모집 인원 기본값: historyLog 마지막 회차(n-1)의 모집 인원. 없으면 표시용 히스토리 마지막 값 사용 */
+  /** 프로그램 선택 시 접수 인원 기본값: historyLog 마지막 회차(n-1)의 접수 인원. 없으면 표시용 히스토리 마지막 값 사용 */
   function getDefaultRecruit(libraryName, programId) {
     var last = getLastRecord(libraryName, programId);
     if (last != null) return last.recruit;
@@ -727,7 +727,7 @@
     });
   }
 
-  /** 1회차일 때 버튼 '입력', 2회차 이상일 때 '수정'. 모집 버튼은 1회차에서도 표시(입력 유도) */
+  /** 1회차일 때 버튼 '입력', 2회차 이상일 때 '수정'. 접수 버튼은 1회차에서도 표시(입력 유도) */
   function applyRecruitmentUI(displaySession, lastRecruit, recruitInput, wrapEl, reasonBlock, reasonInput) {
     if (!recruitInput || !wrapEl) return;
     var readonly = displaySession >= 2;
@@ -780,7 +780,7 @@
         '</div>' +
         '<div class="history-item-right glass">' +
         '<div class="history-item-right-row">' +
-        '<span class="history-stats">모집 ' + rec.recruit + '/참여 ' + rec.attend + '/노쇼 ' + rec.noshow + '</span>' +
+        '<span class="history-stats">접수 ' + rec.recruit + '/참여 ' + rec.attend + '/노쇼 ' + rec.noshow + '</span>' +
         '<span class="history-rate">참여율 ' + rate + '%</span>' +
         '</div>' +
         (rec.reason ? '<span class="history-reason">' + escapeHtml(rec.reason) + '</span>' : '') +
@@ -869,7 +869,7 @@
     var origNoshow = original.noshow != null ? Number(original.noshow) : 0;
     var changedItems = [];
     if (dateVal !== origDate) changedItems.push('운영일자');
-    if (recruitVal !== origRecruit) changedItems.push('모집인원');
+    if (recruitVal !== origRecruit) changedItems.push('접수인원');
     if (attendVal !== origAttend) changedItems.push('참석자수');
     if (noshowVal !== origNoshow) changedItems.push('노쇼');
     if (changedItems.length === 0) {
@@ -1081,15 +1081,15 @@
     var recruitMissing = recruitStr === '' || isNaN(r) || r < 0;
     if (recruitMissing) {
       if (currentSession === 1) {
-        return { ok: false, msg: '1회차는 모집 인원을 반드시 입력해 주세요.' };
+        return { ok: false, msg: '1회차는 접수 인원을 반드시 입력해 주세요.' };
       }
-      return { ok: false, msg: '모집 인원을 반드시 입력해 주세요.' };
+      return { ok: false, msg: '접수 인원을 반드시 입력해 주세요.' };
     }
 
     if (currentSession >= 2 && prevRecruit != null && r < prevRecruit) {
       return {
         ok: false,
-        msg: '모집 인원은 이전 회차(' + prevRecruit + '명)보다 줄어들 수 없습니다.',
+        msg: '접수 인원은 이전 회차(' + prevRecruit + '명)보다 줄어들 수 없습니다.',
         revertTo: prevRecruit
       };
     }
@@ -1098,7 +1098,7 @@
     if (a > r) {
       return {
         ok: false,
-        msg: '참여자 수는 모집 인원을 초과할 수 없습니다. 현장 접수자가 있다면 모집 인원을 먼저 수정해 주세요.',
+        msg: '참여자 수는 접수 인원을 초과할 수 없습니다. 현장 접수자가 있다면 접수 인원을 먼저 수정해 주세요.',
         highlightAttend: true
       };
     }
@@ -1434,7 +1434,7 @@
         var r = parseInt(recruitInput.value.trim(), 10);
         if (isNaN(r)) return;
         if (r < prevRecruit) {
-          alert('모집 인원은 이전 회차(' + prevRecruit + '명)보다 줄어들 수 없습니다.');
+          alert('접수 인원은 이전 회차(' + prevRecruit + '명)보다 줄어들 수 없습니다.');
           recruitInput.value = prevRecruit;
           recruitInput.classList.remove('recruit-success');
           reasonBlock.classList.remove('visible');
