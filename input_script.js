@@ -142,8 +142,12 @@
     } catch (e) { /* quota 등 무시 */ }
   }
 
-  // ——— 누적 기록: 키 = "도서관명|programId", 값 = [{ session, recruit, attend, noshow, reason? }, ...]
+  // ——— 누적 기록: 키 = "도서관명|programId", 값 = [{ _rid, session, recruit, attend, noshow, reason? }, ...]
   var historyLog = {};
+  var historyRidSeq = 1;
+  function createHistoryRid() {
+    return 'h' + Date.now().toString(36) + '_' + (historyRidSeq++);
+  }
   /** 1회차 제출 시 확정된 '총 운영 회수' (키 = logKey, 값 = 숫자). 이후 회차에서 수정 불가 */
   var totalSessionsByProgram = {};
   function logKey(library, programId) { return library + '|' + programId; }
@@ -167,13 +171,12 @@
     return list.length ? list[list.length - 1].recruit : '';
   }
 
-  /** 1 ~ (표시회차-1) 전체 표시용. 비고 있으면 1회차 한 건만 표시 */
+  /** 1 ~ (표시회차-1) 전체 표시용. 비고 있으면 1회차 누적 전체 표시(오래된 순) */
   function getDisplayHistory(libraryName, programId) {
     var program = getProgramById(libraryName, programId);
     var saved = getHistory(libraryName, programId);
     if (program && program.isExhibition) {
-      var one = saved.filter(function (r) { return r.session === 1; })[0];
-      return one ? [one] : [];
+      return saved.filter(function (r) { return r.session === 1; });
     }
     var nextSession = getDisplaySessionNumber(libraryName, programId);
     if (nextSession <= 1) return [];
@@ -497,6 +500,7 @@
     var key = logKey(libraryName, programId);
     if (sessionDateOverride[key]) return sessionDateOverride[key];
     var program = getProgramById(libraryName, programId);
+    if (program && program.isExhibition) return getTodayStr();
     var sessionNum = getDisplaySessionNumber(libraryName, programId);
     return program ? getSessionDateBySchedule(program, sessionNum) : getTodayStr();
   }
@@ -706,7 +710,7 @@
       var currentDate = getSessionDate(libraryName, programId);
       var sessionEl = document.getElementById('currentSession');
       if (!sessionEl) return;
-      var dateForInput = dateToStr(toDate(currentDate));
+      var dateForInput = getTodayStr();
       sessionEl.innerHTML =
         '<div class="current-session-edit">' +
         '<input type="date" id="sessionDateInput" class="input-schedule" value="' + escapeAttr(dateForInput) + '" aria-label="해당 회차 날짜">' +
@@ -722,6 +726,20 @@
             setSessionDateOverride(libraryName, programId, newDate);
           }
           updateSessionDateRow(libraryName, programId);
+        });
+      }
+      if (dateInput) {
+        dateInput.addEventListener('change', function () {
+          var changedDate = dateInput.value.trim();
+          if (changedDate) setSessionDateOverride(libraryName, programId, changedDate);
+        });
+        dateInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            var enterDate = dateInput.value.trim();
+            if (enterDate) setSessionDateOverride(libraryName, programId, enterDate);
+            updateSessionDateRow(libraryName, programId);
+          }
         });
       }
     });
@@ -774,7 +792,7 @@
       var isNew = highlightNew && index === list.length - 1;
       var liClass = 'history-item timeline-item' + (isNew ? ' history-item-new' : '');
       var dateDisplay = getRecordDateDisplay(rec, program);
-      html += '<li class="' + liClass + '" data-session="' + escapeAttr(String(rec.session)) + '" tabindex="0" role="button">' +
+      html += '<li class="' + liClass + '" data-session="' + escapeAttr(String(rec.session)) + '" data-rid="' + escapeAttr(String(rec._rid || '')) + '" tabindex="0" role="button">' +
         '<div class="history-item-left">' +
         '<span class="history-session-with-date">' + rec.session + '회차 | ' + dateDisplay + '</span>' + increaseIcon +
         '</div>' +
@@ -795,7 +813,8 @@
     var items = document.querySelectorAll('#historyList li.history-item[data-session]');
     items.forEach(function (li) {
       var sessionNum = parseInt(li.getAttribute('data-session'), 10);
-      var openModal = function () { openEditHistoryModal(libraryName, programId, sessionNum); };
+      var rid = (li.getAttribute('data-rid') || '').trim();
+      var openModal = function () { openEditHistoryModal(libraryName, programId, sessionNum, rid); };
       li.addEventListener('click', openModal);
       li.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -806,11 +825,13 @@
     });
   }
 
-  function openEditHistoryModal(libraryName, programId, sessionNum) {
+  function openEditHistoryModal(libraryName, programId, sessionNum, recordRid) {
     var overlay = document.getElementById('editHistoryModalOverlay');
     var list = getDisplayHistory(libraryName, programId);
     var program = getProgramById(libraryName, programId);
-    var rec = list.filter(function (r) { return r.session === sessionNum; })[0];
+    var rec = null;
+    if (recordRid) rec = list.filter(function (r) { return r._rid === recordRid; })[0] || null;
+    if (!rec) rec = list.filter(function (r) { return r.session === sessionNum; })[0] || null;
     if (!rec || !overlay) return;
     var raw = rec.date || rec.sessionDate || (program ? getSessionDateBySchedule(program, rec.session) : null) || getTodayStr();
     document.getElementById('editHistoryDate').value = dateToStr(toDate(raw));
@@ -821,7 +842,7 @@
     if (reasonEl) reasonEl.value = '';
     overlay.classList.add('visible');
     overlay.setAttribute('aria-hidden', 'false');
-    overlay._editContext = { libraryName: libraryName, programId: programId, sessionNum: sessionNum, originalRec: { date: dateToStr(toDate(raw)), recruit: rec.recruit, attend: rec.attend, noshow: rec.noshow, reason: rec.reason } };
+    overlay._editContext = { libraryName: libraryName, programId: programId, sessionNum: sessionNum, recordRid: rec._rid || recordRid || '', originalRec: { date: dateToStr(toDate(raw)), recruit: rec.recruit, attend: rec.attend, noshow: rec.noshow, reason: rec.reason } };
   }
 
   function closeEditHistoryModal() {
@@ -854,6 +875,7 @@
     var libraryName = ctx.libraryName;
     var programId = ctx.programId;
     var sessionNum = ctx.sessionNum;
+    var recordRid = ctx.recordRid || '';
     var original = ctx.originalRec || {};
     var dateVal = (document.getElementById('editHistoryDate') || {}).value || '';
     var recruitVal = parseInt((document.getElementById('editHistoryRecruit') || {}).value, 10);
@@ -906,7 +928,9 @@
     var key = logKey(libraryName, programId);
     var arr = historyLog[key];
     if (!arr) return;
-    var rec = arr.filter(function (r) { return r.session === sessionNum; })[0];
+    var rec = null;
+    if (recordRid) rec = arr.filter(function (r) { return r._rid === recordRid; })[0] || null;
+    if (!rec) rec = arr.filter(function (r) { return r.session === sessionNum; })[0] || null;
     if (!rec) return;
     rec.date = dateVal || rec.date;
     rec.recruit = recruitVal;
@@ -1028,8 +1052,9 @@
     var attend = rec.attend != null ? Number(rec.attend) : (rec.participationCount != null ? Number(rec.participationCount) : 0);
     var noshow = rec.noshow != null ? Number(rec.noshow) : (rec.noShowCount != null ? Number(rec.noShowCount) : 0);
     var reason = rec.reason != null ? String(rec.reason) : undefined;
+    var rid = rec._rid != null ? String(rec._rid) : createHistoryRid();
     if (isNaN(session) || session < 1) return null;
-    return { session: session, date: date || undefined, recruit: recruit, attend: attend, noshow: noshow, reason: reason || undefined };
+    return { _rid: rid, session: session, date: date || undefined, recruit: recruit, attend: attend, noshow: noshow, reason: reason || undefined };
   }
 
   /** 구글 스프레드시트에서 해당 도서관·프로그램의 과거 기록 GET 요청 (?action=getHistory) */
@@ -1341,10 +1366,7 @@
         renderHistoryList(lib, id);
         updateCumulativeDisplay(lib, id, attendInput ? attendInput.value : '', noshowInput ? noshowInput.value : '');
         applyExhibitionMode(program, recruitInput, noshowInput, recruitEditBtn, reasonBlock);
-        if (program && program.isExhibition && attendInput) {
-          var exList = getDisplayHistory(lib, id);
-          if (exList.length) attendInput.value = String(exList[0].attend);
-        }
+        if (program && program.isExhibition && attendInput) attendInput.value = '';
       }
 
       var cached = restoreHistoryFromCache(historyCacheKey);
@@ -1486,75 +1508,11 @@
         if (noshowInput) noshowInput.classList.remove('input-error');
 
         var key = logKey(lib, progId);
-        var displayList = getDisplayHistory(lib, progId);
-        var existingOne = displayList[0];
-        if (isExhibition && existingOne && existingOne.session === 1) {
-          var origAttend = existingOne.attend != null ? Number(existingOne.attend) : 0;
-          var origNoshow = existingOne.noshow != null ? Number(existingOne.noshow) : 0;
-          existingOne.attend = result.attend;
-          existingOne.noshow = result.noshow;
-          var programNameForUpdate = (getProgramById(lib, progId) && getProgramById(lib, progId).name) || progId;
-          saveHistoryToCache(getHistoryCacheKey(lib, programNameForUpdate), historyLog[key] || []);
-          renderHistoryList(lib, progId);
-          if (attendInput) attendInput.value = String(result.attend);
-          if (noshowInput) noshowInput.value = String(result.noshow);
-          updateCumulativeDisplay(lib, progId, '0', '0');
-          showToast('참석자수가 수정되었습니다.');
-          var submitterNameUpdate = '';
-          try {
-            var cuU = localStorage.getItem('currentUser');
-            if (cuU) {
-              var uU = JSON.parse(cuU);
-              submitterNameUpdate = (uU && uU.name) ? String(uU.name).trim() : '';
-            }
-          } catch (e2) {}
-          var changeReasonUpdate = '참석자수 수정' + (submitterNameUpdate ? ' - ' + submitterNameUpdate : '');
-          var updatePayload = {
-            action: 'updateHistory',
-            libraryName: lib,
-            programName: programNameForUpdate,
-            currentSession: 1,
-            sessionDate: existingOne.date || '',
-            recruitmentCount: existingOne.recruit != null ? Number(existingOne.recruit) : 0,
-            participationCount: result.attend,
-            noShowCount: result.noshow,
-            changeReason: changeReasonUpdate
-          };
-          fetch(WEB_APP_URL, {
-            method: 'POST',
-            redirect: 'follow',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify(updatePayload)
-          })
-            .then(function (res) { return res.text(); })
-            .then(function (text) {
-              try { return JSON.parse(text); } catch (e) { return {}; }
-            })
-            .then(function (data) {
-              if (data && data.result === 'success') return;
-              existingOne.attend = origAttend;
-              existingOne.noshow = origNoshow;
-              saveHistoryToCache(getHistoryCacheKey(lib, programNameForUpdate), historyLog[key] || []);
-              renderHistoryList(lib, progId);
-              if (attendInput) attendInput.value = String(origAttend);
-              if (noshowInput) noshowInput.value = String(origNoshow);
-              updateCumulativeDisplay(lib, progId, '0', '0');
-              showToast('저장에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.', true);
-            })
-            .catch(function () {
-              existingOne.attend = origAttend;
-              existingOne.noshow = origNoshow;
-              saveHistoryToCache(getHistoryCacheKey(lib, programNameForUpdate), historyLog[key] || []);
-              renderHistoryList(lib, progId);
-              if (attendInput) attendInput.value = String(origAttend);
-              if (noshowInput) noshowInput.value = String(origNoshow);
-              updateCumulativeDisplay(lib, progId, '0', '0');
-              showToast('저장에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.', true);
-            });
-          return;
-        }
 
         var isRecruitIncreased = prevRecruit != null && result.recruit > prevRecruit;
+        var sessionDateInputEl = document.getElementById('sessionDateInput');
+        var pendingDate = sessionDateInputEl ? sessionDateInputEl.value.trim() : '';
+        if (pendingDate) setSessionDateOverride(lib, progId, pendingDate);
         var sessionDateStr = getSessionDate(lib, progId);
         var rate = participationRate(result.recruit, result.attend);
         var submitterName = '';
@@ -1581,6 +1539,7 @@
 
         if (!historyLog[key]) historyLog[key] = [];
         var optimisticRecord = {
+          _rid: createHistoryRid(),
           session: sessionToSubmit,
           date: sessionDateStr,
           recruit: result.recruit,
