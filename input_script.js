@@ -602,14 +602,12 @@
     var summaryEl = document.getElementById('totalSessionsSummary');
     var inputWrap = document.getElementById('totalSessionsInputWrap');
     var totalInput = document.getElementById('totalSessionsInput');
-    var finalNotice = document.getElementById('finalSessionNotice');
     var completionPanel = document.getElementById('completionPanel');
     if (!block || !summaryEl) return;
 
     if (!libraryName || !programId) {
       block.style.display = 'none';
       if (inputWrap) inputWrap.style.display = 'none';
-      if (finalNotice) finalNotice.style.display = 'none';
       if (completionPanel) completionPanel.style.display = 'none';
       var submitBtnReset = document.getElementById('submitBtn');
       if (submitBtnReset) submitBtnReset.disabled = false;
@@ -623,7 +621,6 @@
     var theoreticalMax = program ? countSessionDaysInPeriod(program) : 0;
     if (displaySession > 1 && total == null) {
       block.style.display = 'none';
-      if (finalNotice) finalNotice.style.display = 'none';
       var submitBtnReset2 = document.getElementById('submitBtn');
       if (submitBtnReset2) submitBtnReset2.disabled = false;
       return;
@@ -692,14 +689,6 @@
       }
     }
 
-    if (finalNotice) {
-      var effectiveTotal = total != null ? total : (displaySession === 1 && totalInput && totalInput.value.trim() !== '' ? parseInt(totalInput.value.trim(), 10) : null);
-      if (effectiveTotal != null && displaySession === effectiveTotal) {
-        finalNotice.style.display = 'block';
-      } else {
-        finalNotice.style.display = 'none';
-      }
-    }
     if (completionPanel) completionPanel.style.display = 'none';
   }
 
