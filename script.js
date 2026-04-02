@@ -321,19 +321,19 @@
           '<div class="stats-row">' +
           '<div class="stat-item">' +
           '<div class="stat-label">프로그램 수</div>' +
-          '<div class="stat-value">' + programCount + '</div>' +
+          '<div class="stat-value">' + formatNum(programCount) + '</div>' +
           '</div>' +
           '<div class="stat-item">' +
           '<div class="stat-label">접수 인원</div>' +
-          '<div class="stat-value">' + recruit + '</div>' +
+          '<div class="stat-value">' + formatNum(recruit) + '</div>' +
           '</div>' +
           '<div class="stat-item">' +
           '<div class="stat-label">참여 인원</div>' +
-          '<div class="stat-value">' + attend + '</div>' +
+          '<div class="stat-value">' + formatNum(attend) + '</div>' +
           '</div>' +
           '<div class="stat-item muted">' +
           '<div class="stat-label">노쇼</div>' +
-          '<div class="stat-value">' + noshow + '</div>' +
+          '<div class="stat-value">' + formatNum(noshow) + '</div>' +
           '</div>' +
           '</div>';
         grid.appendChild(card);
